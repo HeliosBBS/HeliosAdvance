@@ -67,7 +67,9 @@ security-sensitive path appears, the diff outgrows the plan; then one tier up wi
 attempt's notes, and a second failure is a human-action item. Review is never downgraded:
 Opus or stronger reviews every task, the hostile reviewer anything security-sensitive. A Fable
 pin on a subagent can be silently served by Sonnet, so Fable-level work runs in-session and
-every pinned dispatch is verified from the transcript.
+every pinned dispatch is verified from the transcript. Within a task, a session may dispatch
+subagents or a workflow at whatever model and effort a piece needs; it never lowers its own
+task's tier or effort, and the review tier does not move.
 
 ## Branches and identity
 
