@@ -350,7 +350,16 @@ function Get-TaskText([string]$body) {
     $lines -join "`n"
 }
 
-function Build-ReviewPrompt($issue, [string]$task, [string]$diff, [bool]$hostile) {
+function Build-ReviewPrompt($issue, [string]$task, [string]$diff, [bool]$hostile, [string]$history = "") {
+    $earlier = if ($history) {
+        @"
+
+## Earlier review rounds on this task
+The rounds below were already reported and their findings fixed. Do not reverse a fix an earlier round asked for
+unless it was wrong, and then say which round and why; do not re-report what an earlier round settled.
+$history
+"@
+    } else { "" }
     $stance = if ($hostile) {
         "This task is security-sensitive, so you are the hostile reviewer: your job is to break it. Run the security-checklist skill over the diff and report every way an attacker, a misconfigured server or a failing dependency gets past it."
     } else { "You are the reviewer." }
@@ -395,6 +404,7 @@ $task
 ``````diff
 $diff
 ``````
+$earlier
 "@
 }
 
@@ -494,21 +504,29 @@ function Invoke-Iteration([int]$iteration) {
     if ($marker -eq "DONE" -and $pick.planned) {
         $hostile = ($issue.labels | ForEach-Object { $_.name }) -contains "security-sensitive" -or (Get-TaskText $issue.body) -match 'Security-sensitive: yes'
         $round = 0
+        # Earlier rounds' reports, across iterations until the tick, so a reviewer does not
+        # re-litigate what a previous one settled.
+        $history = [string](Get-Field $state reviewHistory)
         while ($true) {
             $head = (& git.exe -C $worktree rev-parse HEAD).Trim()
             if ($head -eq $base) { $marker = "HUMAN"; $detail = "the session reported DONE with nothing committed since the last ticked task"; break }
             $diff = (& git.exe -C $worktree diff "$base..$head") -join "`n"
             Log "#${number}: review $($round + 1) on opus"
-            $review = Invoke-Session $worktree (Build-ReviewPrompt $issue (Get-TaskText $issue.body) $diff $hostile) "opus" "high" "$log.review$($round + 1)" "review"
+            $review = Invoke-Session $worktree (Build-ReviewPrompt $issue (Get-TaskText $issue.body) $diff $hostile $history) "opus" "high" "$log.review$($round + 1)" "review"
             $verdict = Get-ReviewVerdict $review.Text
             Write-Usage $number $state.iterations "review" "opus" "high" $verdict $review "$log.review$($round + 1)"
             if ($verdict -eq "PAUSE") { $marker = "PAUSE"; $detail = $review.Text; break }
+            $history += "`n`n### Round (iteration $($state.iterations), review $($round + 1)): $verdict`n" + $review.Text
+            $state | Add-Member -NotePropertyName reviewHistory -NotePropertyValue $history -Force
             if ($verdict -eq "PASS") {
                 $commits = (& git.exe -C $worktree log --format=%h "$base..$head") -join ", "
                 Push-Location $repoDir
                 try { & work tick $number 1 "$commits; reviewed at opus after $round fix round(s): pass" | Out-Null; $ticked = $LASTEXITCODE -eq 0 }
                 finally { Pop-Location }
-                if ($ticked) { $state | Add-Member -NotePropertyName reviewedHead -NotePropertyValue $head -Force }
+                if ($ticked) {
+                    $state | Add-Member -NotePropertyName reviewedHead -NotePropertyValue $head -Force
+                    $state | Add-Member -NotePropertyName reviewHistory -NotePropertyValue "" -Force
+                }
                 else { $marker = "HUMAN"; $detail = "the review passed but the box could not be ticked" }
                 break
             }
