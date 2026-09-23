@@ -92,9 +92,10 @@ off who's-online.
    Abuse: they are a server, with everything a server can do. Decision: this feature does not
    weaken that; first-run setup (which creates the board and its first login with the
    database administrator's credential, supplied once by the local operator and never stored
-   or logged) and the join feature are the only gates that hand them out, a server's local
-   file holds nothing beyond its bootstrap record, and removing a server revokes its own
-   database login. Why:
+   or logged) and the join feature are the only tools that hand them out; a server, trusted
+   as a server, can add one through the same operation, and the entry names it; a server's
+   local file holds nothing beyond its bootstrap record, and removing a server revokes its
+   own database login. Why:
    one trust boundary, guarded once. Fails closed: no credentials, no server.
 3. **A misbehaving or misconfigured server.** Attacker: a server that lies about its node
    count, renews a lease it should not, or claims nodes outside its range. Abuse: exhausting
