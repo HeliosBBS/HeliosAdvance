@@ -1,0 +1,15 @@
+# Read from the base branch (development): a Dependabot pull request is approved and
+# queued by the estate's reusable workflow once its checks pass.
+name: Dependabot
+
+on:
+  pull_request_target:
+    types: [opened, reopened, synchronize]
+    branches: [development]
+
+permissions: {}
+
+jobs:
+  merge:
+    uses: HeliosBBS/.github/.github/workflows/dependabot-merge.yml@main
+    secrets: inherit
