@@ -13,14 +13,16 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   `hadv-config-gui` expose all of them with parity. Most settings are tunable there. Defaults
   are secure by default; loosening is the sysop's explicit choice. Depends on: servers.
 - **Sensitive data encrypted at rest**: passwords hashed, secrets and other sensitive fields
-  encrypted in the store, keys managed. Depends on: servers.
+  encrypted in the database, keys managed. Depends on: servers.
 - **Scripting layer**: all BBS logic runs in theme scripts through a public `bbs.*` API with a
   deprecation contract; the engine has no BBS logic of its own. Depends on: servers,
   configuration.
 - **Theme packs**: scripts plus terminal text and graphics plus web code, in one pack;
   installed, selected, defaulted and disabled by the sysop. Two ship. The modern theme is the
   fallback for everything, cannot be deleted, is not supported if edited; a sysop can disable it
-  from selection and make another theme the default. Depends on: scripting layer.
+  from selection and make another theme the default. Where theme files live (database or
+  disk, and how every server gets them) is decided here, not assumed. Depends on: scripting
+  layer.
 - **Certificates**: `hadv-cert` (TUI only) generates self-signed certificates and installs
   supplied ones; TLS Telnet, HTTPS and SSH host keys draw on it. ACME is not spoken by the
   engine; an ACME client uses `hadv-cert` to install what it obtained. Depends on:
@@ -67,25 +69,50 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   cannot be forged. Depends on: Telnet, SSH and web callers.
 - **Languages**: every string in one TOML file per language, shared by every executable;
   plural, gender and case handled so languages other than English read correctly;
-  `hadv-strings` and `hadv-strings-gui` edit them. Depends on: configuration.
+  `hadv-strings` and `hadv-strings-gui` edit them. Where language files live (database or
+  disk, and how every server gets them) is decided here, not assumed. Depends on:
+  configuration.
 
 ## Operating the board
 
 - **Admin API**: what the configuration, console, user-editor and strings tools use; nothing
-  but the engine touches the store. Depends on: RBAC.
+  but the engine touches the database. Depends on: RBAC.
 - **Public API**: the board's HTTP interface for clients, with its OpenAPI description.
   Depends on: web caller, accounts, RBAC. Touches the Portal and the load tester.
 - **Waiting-for-Caller console**: `hadv-console` and `hadv-console-gui`: who is on which node
   on which server, activity; spawns the user editor. Depends on: Admin API.
 - **User editor**: `hadv-useredit` and `hadv-useredit-gui`, spawned from the console or run
   alone. Depends on: RBAC, Admin API.
-- **Server join by pairing code**: a sysop adds a server to the board with a code shown on an
-  existing server's console, through `hadv-setup`. Depends on: servers.
+- **Server join by pairing code**: a sysop adds a server to the board: on the existing server,
+  `hadv-config` shows a code; on the new server, `hadv-setup` asks for the existing server's
+  address and the code; once the two agree, the new server receives what it needs over a
+  secure channel. Settled for its brainstorm: the code is the secret of a password-
+  authenticated key exchange, so a machine in the middle cannot complete the join and a wrong
+  guess learns nothing; codes are single-use, expire in minutes, and a source that fails a few
+  times is locked out; no private key is ever transferred, each server generates its own and
+  gets a certificate signed over the paired channel from a board signing key held encrypted in
+  the database; each server gets its own database login so removing a server revokes it alone;
+  KEK rotation is a separate documented action for a compromised server; the local secrets
+  file is protected by the operating system's best available tier (DPAPI at machine scope,
+  systemd credentials, else a service-user-only file with a warning) and `hadv-setup` says
+  which tier it got. The earlier design is read for the questions it settled, not for
+  answers. Depends on: servers.
 - **First-run setup**: `hadv-setup` (TUI only) takes a fresh install to a running board:
-  sysop account with its second factor enrolled, listeners, store, certificates. Depends on:
+  sysop account with its second factor enrolled, listeners, database, certificates. Depends on:
   servers, certificates, RBAC, second factor.
 - **Installation**: Inno Setup on Windows, WinGet wrapping it, RPM and DEB on Linux, a
   container image; the same result on every target. Depends on: service lifecycle.
+- **Auto-update**: a server updates itself from the published releases, verifying the
+  release's signature and build-provenance attestation against the project's publishing
+  identity before anything is applied (supply-chain protection built on the git and release
+  infrastructure), rolling across a multi-server board one server at a time within the
+  one-version skew rule. Depends on: installation, servers, nodes and one board.
+- **Fault-tolerant database, documented**: a sysop guide chapter on running the board behind a
+  PostgreSQL proxy that provides failover and pooling (Pgpool-II, or PgBouncer with Patroni
+  and HAProxy); the engine needs nothing special. The proxy must pool in session mode: the
+  servers' inter-server bus is LISTEN/NOTIFY, which needs a persistent session, and
+  transaction-mode pooling breaks it silently. Depends on: servers, nodes and one board;
+  the sysop guide.
 
 ## Content
 
