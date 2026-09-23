@@ -1,0 +1,8 @@
+# Developer-owned paths: a change here merges only on the developer's review.
+/features/          @Paswaru
+/docs/spec/         @Paswaru
+/CONSTITUTION.md    @Paswaru
+/LICENSE            @Paswaru
+/LICENSE.exception  @Paswaru
+/.claude/           @Paswaru
+/.github/           @Paswaru

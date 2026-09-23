@@ -1,0 +1,17 @@
+name: Scorecard
+
+on:
+  schedule:
+    - cron: "41 6 * * 1"
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  scorecard:
+    uses: HeliosBBS/.github/.github/workflows/scorecard.yml@main
+    permissions:
+      contents: read
+      id-token: write
