@@ -58,6 +58,8 @@ private advisory.
 
 ## Routing
 
+Quality first, token saving second: in doubt, route up, never down, and a saving is taken
+only where the task has one right answer.
 Sonnet 5 at high effort is the default, not a floor and not a ceiling: every model and effort
 level is available and the task's shape picks it. Route down (Haiku, or Sonnet at low) for
 mechanical work with one right answer; route up (Opus, or Fable in-session) when reasoning is
@@ -67,7 +69,9 @@ security-sensitive path appears, the diff outgrows the plan; then one tier up wi
 attempt's notes, and a second failure is a human-action item. Review is never downgraded:
 Opus or stronger reviews every task, the hostile reviewer anything security-sensitive. A Fable
 pin on a subagent can be silently served by Sonnet, so Fable-level work runs in-session and
-every pinned dispatch is verified from the transcript.
+every pinned dispatch is verified from the transcript. Within a task, a session may dispatch
+subagents or a workflow at whatever model and effort a piece needs; it never lowers its own
+task's tier or effort, and the review tier does not move.
 
 ## Branches and identity
 

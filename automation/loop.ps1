@@ -103,18 +103,22 @@ function Read-LoopState {
 
 function Write-LoopState($state) { $state | ConvertTo-Json | Set-Content $loopStateFile }
 
-# The next unticked task's tier decides the model; session-tier work is not the loop's.
-function Get-TaskTier([string]$body) {
+# The next unticked task's tag decides the model and the effort: [tier: sonnet] or
+# [tier: opus, effort: max]; effort is high unless the tag says otherwise. Session-tier
+# work is not the loop's.
+function Get-TaskTag([string]$body) {
     $in = $false
     foreach ($line in $body -split "`n") {
         $t = $line.Trim()
         if ($t.StartsWith("### ")) { $in = ($t -eq "### Plan"); continue }
         if ($in -and $t.StartsWith("- [ ]")) {
-            if ($t -match '\[tier:\s*(haiku|sonnet|opus|session)\]') { return $Matches[1] }
-            return "sonnet"
+            if ($t -match '\[tier:\s*(haiku|sonnet|opus|session)(?:,\s*effort:\s*(low|medium|high|max))?\]') {
+                return @($Matches[1], $(if ($Matches.ContainsKey(2)) { $Matches[2] } else { "high" }))
+            }
+            return @("sonnet", "high")
         }
     }
-    "sonnet"
+    @("sonnet", "high")
 }
 
 function Next-Tier([string]$tier) {
@@ -214,12 +218,12 @@ function Get-Field($object, [string]$name) {
 # result line carries the session ID, token counts, cost and per-model usage. Peak context
 # is the largest prompt any assistant message paid for, which is what tells a bloated
 # context from a long task when a run costs more than expected.
-function Invoke-Session([string]$dir, [string]$prompt, [string]$model, [string]$logPath) {
+function Invoke-Session([string]$dir, [string]$prompt, [string]$model, [string]$effort, [string]$logPath) {
     $env:WORK_IDENTITY = $identity
     $started = Get-Date
     Push-Location $dir
     try {
-        $lines = @(& claude -p $prompt --model $model --effort high --dangerously-skip-permissions --output-format stream-json --verbose 2>&1 |
+        $lines = @(& claude -p $prompt --model $model --effort $effort --dangerously-skip-permissions --output-format stream-json --verbose 2>&1 |
             ForEach-Object { "$_" } | Tee-Object -FilePath $logPath)
     }
     finally { Pop-Location }
@@ -276,7 +280,7 @@ function Get-SubagentModels([string]$sessionId) {
 
 # One JSON line per session run, every repository in one file. Each run is its own
 # session, so a line is a complete figure: summing lines never double-counts.
-function Write-Usage([int]$number, [int]$iteration, [string]$tier, [string]$model, [string]$outcome, $session, [string]$logPath) {
+function Write-Usage([int]$number, [int]$iteration, [string]$tier, [string]$model, [string]$effort, [string]$outcome, $session, [string]$logPath) {
     $result = $session.Result
     $usage = Get-Field $result usage
     $models = [ordered]@{}
@@ -292,7 +296,7 @@ function Write-Usage([int]$number, [int]$iteration, [string]$tier, [string]$mode
     $windows = Get-Field $session.RateLimit unifiedWindows
     $record = [ordered]@{
         at = (Get-Date).ToString('s'); repo = $Repo; issue = $number; iteration = $iteration
-        tier = $tier; model = $model; outcome = $outcome; seconds = $session.Seconds
+        tier = $tier; model = $model; effort = $effort; outcome = $outcome; seconds = $session.Seconds
         session_id = $sessionId; turns = [int](Get-Field $result num_turns)
         in = [int64](Get-Field $usage input_tokens); cache_write = [int64](Get-Field $usage cache_creation_input_tokens)
         cache_read = [int64](Get-Field $usage cache_read_input_tokens); out = [int64](Get-Field $usage output_tokens)
@@ -319,10 +323,10 @@ function Get-Marker([string]$text) {
 }
 
 # One session, its marker, and its usage record.
-function Invoke-Task([int]$number, [int]$iteration, [string]$worktree, $issue, [string]$learnings, [string]$notes, [string]$tier, [string]$model, [string]$logPath) {
-    $session = Invoke-Session $worktree (Build-Prompt $issue $learnings $notes) $model $logPath
+function Invoke-Task([int]$number, [int]$iteration, [string]$worktree, $issue, [string]$learnings, [string]$notes, [string]$tier, [string]$model, [string]$effort, [string]$logPath) {
+    $session = Invoke-Session $worktree (Build-Prompt $issue $learnings $notes) $model $effort $logPath
     $marker, $detail = Get-Marker $session.Text
-    Write-Usage $number $iteration $tier $model $marker $session $logPath
+    Write-Usage $number $iteration $tier $model $effort $marker $session $logPath
     @($session, $marker, $detail)
 }
 
@@ -341,7 +345,7 @@ function Invoke-Iteration([int]$iteration) {
     if ($pick.claimed_by -ne $identity) { Push-Location $repoDir; & work claim $number | Out-Null; Pop-Location }
     Log "#${number}: $($issue.title)"
 
-    $tier = if ($pick.planned) { Get-TaskTier $issue.body } else { "sonnet" }
+    $tier, $effort = if ($pick.planned) { Get-TaskTag $issue.body } else { @("sonnet", "high") }
     if ($tier -eq "session") { Set-Human $number "the next task is session-tier: it needs an interactive session with the developer"; return "continue" }
 
     $branch = "feature/issue-$number-$(Slug $issue.title)"
@@ -372,14 +376,14 @@ function Invoke-Iteration([int]$iteration) {
     $learnings = Get-Content (Join-Path $wikiDir "Learnings.md") -Raw
     $ticksBefore = ([regex]::Matches($issue.body, '- \[x\]')).Count
     Log "#${number}: running on $tier"
-    $session, $marker, $detail = Invoke-Task $number $state.iterations $worktree $issue $learnings $state.notes $tier $tier $log
+    $session, $marker, $detail = Invoke-Task $number $state.iterations $worktree $issue $learnings $state.notes $tier $tier $effort $log
 
     if ($marker -eq "ROUTE-UP") {
         $up = Next-Tier $tier
         if ($up) {
             Log "#${number}: routing up to $up"
             $state.notes = $detail
-            $session, $marker, $detail = Invoke-Task $number $state.iterations $worktree $issue $learnings $state.notes $tier $up "$log.escalated"
+            $session, $marker, $detail = Invoke-Task $number $state.iterations $worktree $issue $learnings $state.notes $tier $up $effort "$log.escalated"
         }
         if ($marker -eq "ROUTE-UP") { $marker = "HUMAN"; $detail = "failed after routing up: $detail" }
     }
