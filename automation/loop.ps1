@@ -185,14 +185,16 @@ Read the issue, then the learnings. Do exactly one of these, then stop:
 - If the issue's Plan section has no checklist, run the feature-plan skill and write the plan into the issue.
 - Otherwise run the feature-build skill for the first unticked task only.
 
-Rules: one task per session. Commit and push only when ``make check`` is green. Tick the box with
-``work tick``. Append a one-line learning to ``$wikiDir\Learnings.md`` (commit and push there) if
-you learned a sign. Never edit features/, CONSTITUTION.md or the licence files. Never ask a
-question: if a task needs judgment the plan is wrong. Reference the issue as #$($issue.number)
-in commits; never write Closes until every box is ticked, then open the pull request.
+Rules: one task per session. Commit and push only when ``make check`` is green. Do not tick the
+box and do not dispatch a reviewer: the loop reviews your commit at Opus and ticks the box on a
+pass; findings come back to you as notes. Append a one-line learning to ``$wikiDir\Learnings.md``
+(commit and push there) if you learned a sign. Never edit features/, CONSTITUTION.md or the
+licence files. Never ask a question: if a task needs judgment the plan is wrong. Reference the
+issue as #$($issue.number) in commits; never write Closes until every box is ticked, then open
+the pull request.
 
 End your output with exactly one line, and nothing after it:
-  LOOP: DONE                 the task landed (or the plan is in the issue)
+  LOOP: DONE                 the task is committed and pushed (or the plan is in the issue)
   LOOP: ROUTE-UP <notes>     tests failed twice with different fixes, or the diff outgrew the task
   LOOP: HUMAN <reason>       a decision, a broken baseline, or an unplanned security-sensitive path
 
@@ -218,14 +220,19 @@ function Get-Field($object, [string]$name) {
 # result line carries the session ID, token counts, cost and per-model usage. Peak context
 # is the largest prompt any assistant message paid for, which is what tells a bloated
 # context from a long task when a run costs more than expected.
-function Invoke-Session([string]$dir, [string]$prompt, [string]$model, [string]$effort, [string]$logPath) {
+function Invoke-Session([string]$dir, [string]$prompt, [string]$model, [string]$effort, [string]$logPath, [string]$mode = "build") {
     $env:WORK_IDENTITY = $identity
     $started = Get-Date
+    # A build session may do anything in its worktree; a review session reads, diffs and
+    # runs tests, and cannot edit, so a reviewer never fixes what it should report.
+    $permissions = if ($mode -eq "review") {
+        @("--allowedTools", "Read,Grep,Glob,Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(go test:*),Bash(go vet:*)")
+    } else { @("--dangerously-skip-permissions") }
     Push-Location $dir
     try {
         # The prompt goes in on stdin: it carries the whole issue body, and a Windows
         # command line is capped near 32 KB.
-        $lines = @($prompt | & claude -p --model $model --effort $effort --dangerously-skip-permissions --output-format stream-json --verbose 2>&1 |
+        $lines = @($prompt | & claude -p --model $model --effort $effort @permissions --output-format stream-json --verbose 2>&1 |
             ForEach-Object { "$_" } | Tee-Object -FilePath $logPath)
     }
     finally { Pop-Location }
@@ -324,6 +331,67 @@ function Get-Marker([string]$text) {
     @("NONE", "")
 }
 
+# The first unticked task: its box line and the indented lines under it.
+function Get-TaskText([string]$body) {
+    $in = $false
+    $lines = @()
+    foreach ($line in $body -split "`n") {
+        $t = $line.Trim()
+        if ($t.StartsWith("### ")) { $in = ($t -eq "### Plan"); continue }
+        if (-not $in) { continue }
+        if ($lines.Count -eq 0) { if ($t.StartsWith("- [ ]")) { $lines += $line }; continue }
+        if ($t -eq "" -or $t.StartsWith("- [") -or $t.StartsWith("**")) { break }
+        $lines += $line
+    }
+    $lines -join "`n"
+}
+
+function Build-ReviewPrompt($issue, [string]$task, [string]$diff, [bool]$hostile) {
+    $stance = if ($hostile) {
+        "This task is security-sensitive, so you are the hostile reviewer: your job is to break it. Run the security-checklist skill over the diff and report every way an attacker, a misconfigured server or a failing dependency gets past it."
+    } else { "You are the reviewer." }
+    @"
+$stance You are working read-only in the worktree for issue #$($issue.number) of $Owner/$Repo, on the diff of one task
+that a build session committed. Review in two stages and report; do not fix anything.
+
+Stage 1, against the brief and the plan: was the task's behaviour built exactly, and nothing else? Does the test prove
+each acceptance line (read the spec sections the task cites under docs/spec/ and the brief under features/)? Would the test
+fail without the change, for the reason the task states, and does it wrap and inject the way real callers will (a %w wrap,
+a real socket, the real database)? Is anything in the diff outside the task?
+
+Stage 2, code quality. Name these bug classes explicitly, each checked: 1 fail-open error handling (a gate that checks the
+result and ignores the error); 2 a nullable column scanned into a non-pointer field; 3 a string identifier that does not
+match its source of truth; 4 send on a closed channel in fan-out code; 5 a doc comment asserting the opposite of the
+behaviour; 6 security-critical logic duplicated across surfaces; 7 a multi-step database operation without a transaction;
+8 a state-changing operator action with no audit entry; 9 a regression test that still passes when the fix is reverted.
+Then the constitution's invariants: gates fail closed on any error; one implementation of each security mechanism; every
+state-changing operator action writes an audit entry; every permission check has a negative-path test. Then CLAUDE.md's
+rules: home-grown first (the standard library before a hand-written mechanism), no unrequested features or single-use
+abstractions, no rule the specification does not state, comments only where the reader learns something the code cannot
+say, readable names.
+
+Report every finding as a numbered line: the file, what is wrong, the fix you expect. Say nothing about what is fine.
+End your output with exactly one line, and nothing after it:
+  REVIEW: PASS       no finding
+  REVIEW: FINDINGS   one or more findings above
+
+## The task
+$task
+
+## The diff
+``````diff
+$diff
+``````
+"@
+}
+
+function Get-ReviewVerdict([string]$text) {
+    if ($text -match '(?im)(reached|hit)\s.*\blimit\b|usage limit|rate limit') { return "PAUSE" }
+    $lines = @($text -split "`n" | Where-Object { $_.Trim() })
+    if ($lines.Count -gt 0 -and $lines[-1].Trim() -match '^REVIEW:\s*(PASS|FINDINGS)\b') { return $Matches[1] }
+    "FINDINGS"
+}
+
 # One session, its marker, and its usage record.
 function Invoke-Task([int]$number, [int]$iteration, [string]$worktree, $issue, [string]$learnings, [string]$notes, [string]$tier, [string]$model, [string]$effort, [string]$logPath) {
     $session = Invoke-Session $worktree (Build-Prompt $issue $learnings $notes) $model $effort $logPath
@@ -380,7 +448,7 @@ function Invoke-Iteration([int]$iteration) {
     finally { Pop-Location }
 
     $learnings = Get-Content (Join-Path $wikiDir "Learnings.md") -Raw
-    $ticksBefore = ([regex]::Matches($issue.body, '- \[x\]')).Count
+    $base = (& git.exe -C $worktree rev-parse HEAD).Trim()
     Log "#${number}: running on $tier"
     $session, $marker, $detail = Invoke-Task $number $state.iterations $worktree $issue $learnings $state.notes $tier $tier $effort $log
 
@@ -401,14 +469,53 @@ function Invoke-Iteration([int]$iteration) {
         return "pause:" + $detail
     }
 
+    # The review is the loop's, never the session's: Opus reads the task's diff and reports;
+    # findings go back to the build tier for one fix round, then one tier up, then to the
+    # developer. The box is ticked only on a pass, so a session's word decides nothing.
+    $ticked = $false
+    if ($marker -eq "DONE" -and $pick.planned) {
+        $hostile = ($issue.labels | ForEach-Object { $_.name }) -contains "security-sensitive" -or (Get-TaskText $issue.body) -match 'Security-sensitive: yes'
+        $round = 0
+        while ($true) {
+            $head = (& git.exe -C $worktree rev-parse HEAD).Trim()
+            if ($head -eq $base) { $marker = "HUMAN"; $detail = "the session reported DONE without a commit"; break }
+            $diff = (& git.exe -C $worktree diff "$base..$head") -join "`n"
+            Log "#${number}: review $($round + 1) on opus"
+            $review = Invoke-Session $worktree (Build-ReviewPrompt $issue (Get-TaskText $issue.body) $diff $hostile) "opus" "high" "$log.review$($round + 1)" "review"
+            $verdict = Get-ReviewVerdict $review.Text
+            Write-Usage $number $state.iterations "review" "opus" "high" $verdict $review "$log.review$($round + 1)"
+            if ($verdict -eq "PAUSE") { $marker = "PAUSE"; $detail = $review.Text; break }
+            if ($verdict -eq "PASS") {
+                $commits = (& git.exe -C $worktree log --format=%h "$base..$head") -join ", "
+                Push-Location $repoDir
+                try { & work tick $number 1 "$commits; reviewed at opus after $round fix round(s): pass" | Out-Null; $ticked = $LASTEXITCODE -eq 0 }
+                finally { Pop-Location }
+                if (-not $ticked) { $marker = "HUMAN"; $detail = "the review passed but the box could not be ticked" }
+                break
+            }
+            $round++
+            $fixModel = if ($round -eq 1) { $tier } elseif ($round -eq 2) { Next-Tier $tier } else { $null }
+            if (-not $fixModel) {
+                & gh issue comment $number -R "$Owner/$Repo" --body ("Review findings remain after a fix round and a route-up:`n`n" + $review.Text) | Out-Null
+                $marker = "HUMAN"; $detail = "review findings remain after a fix round and a route-up; see the review comment"
+                break
+            }
+            Log "#${number}: review findings; fixing on $fixModel"
+            $state.notes = "Review findings to fix, from the reviewer's report; commit and push the fix:`n" + $review.Text
+            $session, $marker, $detail = Invoke-Task $number $state.iterations $worktree $issue $learnings $state.notes $tier $fixModel $effort "$log.fix$round"
+            $lastLines = ($session.Text -split "`n" | Select-Object -Last 40) -join "`n"
+            if ($marker -eq "PAUSE") { break }
+            if ($marker -ne "DONE") { $marker = "HUMAN"; $detail = "the fix round ended with $marker $detail"; break }
+        }
+        if ($marker -eq "PAUSE") { $state.notes = $lastLines; Write-State $number $state; return "pause:" + $detail }
+    }
+
     # The gutter detector: the same failing test, or the same files churned with no box ticked,
     # three iterations running; or a placeholder that passes. Test names are read from the
     # raw stream, where tool output is JSON-escaped, so the name stops at a backslash.
     $failing = @([regex]::Matches($session.Raw, '--- FAIL: ([^\s\\"]+)') | ForEach-Object { $_.Groups[1].Value } | Sort-Object -Unique)
     $changed = @(& git.exe -C $worktree diff --name-only origin/development | Sort-Object)
     Push-Location $repoDir; & work refresh 2>&1 | Out-Null; Pop-Location
-    $after = Get-Content (Join-Path $repoDir "issues.jsonl") | ForEach-Object { $_ | ConvertFrom-Json } | Where-Object number -eq $number
-    $ticked = $after -and ([regex]::Matches($after.body, '- \[x\]')).Count -gt $ticksBefore
     $state.failingTests = @($state.failingTests + , $failing | Select-Object -Last 3)
     $state.changedFiles = @($state.changedFiles + , $changed | Select-Object -Last 3)
     if ($ticked) { $state.ticks++; $state.notes = "" } else { $state.notes = $lastLines }
