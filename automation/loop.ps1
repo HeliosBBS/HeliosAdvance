@@ -325,7 +325,8 @@ try {
     Invoke-Git $repoDir fetch --quiet --prune origin | Out-Null
     Invoke-Git $repoDir checkout --quiet development | Out-Null
     Invoke-Git $repoDir reset --quiet --hard origin/development | Out-Null
-    Invoke-Git $wikiDir pull --quiet --ff-only | Out-Null
+    Invoke-Git $wikiDir fetch --quiet origin | Out-Null
+    Invoke-Git $wikiDir reset --quiet --hard origin/master | Out-Null
 
     for ($iteration = 1; $iteration -le $MaxIterations; $iteration++) {
         if (Test-Path $stopFile) { Log "stop requested; ending"; break }
