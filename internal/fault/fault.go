@@ -21,8 +21,8 @@ func (c Class) Error() string { return string(c) }
 
 // ClassOf is the first class in a depth-first walk of the wrap chain and whether one
 // was found; no class takes precedence over another. Only a Class in the chain counts:
-// an error whose Is method claims a sentinel is not classified, so a boundary that
-// wants a class wraps one.
+// an error whose Is or As method claims a sentinel is not classified, so a boundary
+// that wants a class wraps one.
 func ClassOf(err error) (Class, bool) {
 	// errors.As would stop at the first Class of any value, so an undeclared one would
 	// hide a declared class after it; this walks the chain in errors.As's order instead.

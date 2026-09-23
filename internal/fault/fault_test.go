@@ -13,6 +13,18 @@ type claimsDenied struct{}
 func (claimsDenied) Error() string   { return "claims denied" }
 func (claimsDenied) Is(t error) bool { return t == Denied }
 
+// claimsDeniedByAs says it is Denied to errors.As without carrying a Class.
+type claimsDeniedByAs struct{}
+
+func (claimsDeniedByAs) Error() string { return "claims denied by As" }
+func (claimsDeniedByAs) As(target any) bool {
+	if c, ok := target.(*Class); ok {
+		*c = Denied
+		return true
+	}
+	return false
+}
+
 func TestClassOf(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
@@ -25,6 +37,7 @@ func TestClassOf(t *testing.T) {
 		{"foreign error", errors.New("x"), "", false},
 		{"join of foreign errors", errors.Join(errors.New("a"), fmt.Errorf("b: %w", io.EOF)), "", false},
 		{"an Is method claiming a sentinel carries no class", fmt.Errorf("w: %w", claimsDenied{}), "", false},
+		{"an As method claiming a sentinel carries no class", fmt.Errorf("w: %w", claimsDeniedByAs{}), "", false},
 		{"Unavailable direct", Unavailable, Unavailable, true},
 		{"Unavailable wrapped", fmt.Errorf("renew: %w", Unavailable), Unavailable, true},
 		{"Conflict wrapped twice", fmt.Errorf("outer: %w", fmt.Errorf("inner: %w", Conflict)), Conflict, true},
