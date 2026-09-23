@@ -29,6 +29,7 @@ func TestClassOf(t *testing.T) {
 		{"first found wins when the earlier-declared class comes first", errors.Join(Refused, Invalid), Refused},
 		{"depth-first: a wrapped class before a bare one later in the join", errors.Join(fmt.Errorf("c: %w", Denied), Conflict), Denied},
 		{"depth-first through two %w verbs", fmt.Errorf("%w %w", fmt.Errorf("x: %w", NotFound), Refused), NotFound},
+		{"a wrapped None does not hide a real class joined alongside it", errors.Join(fmt.Errorf("x: %w", None), Denied), Denied},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
