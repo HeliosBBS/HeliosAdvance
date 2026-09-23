@@ -1,0 +1,15 @@
+name: Plan stale
+
+on:
+  push:
+    branches: [development]
+    paths:
+      - "docs/spec/**"
+      - docs/stack.md
+
+permissions: {}
+
+jobs:
+  stale:
+    uses: HeliosBBS/.github/.github/workflows/plan-stale.yml@main
+    secrets: inherit
