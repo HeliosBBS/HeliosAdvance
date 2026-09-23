@@ -1,5 +1,5 @@
 # Audit
-Serves: ADV-001
+Serves: ADV-001, ADV-002
 
 ## Purpose
 Serves: ADV-001
@@ -13,12 +13,12 @@ Serves: ADV-001
 As the glossary defines it: actor.
 
 ## Contracts
-Serves: ADV-001
+Serves: ADV-001, ADV-002
 Provided, **audit v1**:
 
 | Operation | Inputs | Outputs | Errors |
 |---|---|---|---|
-| record | inside the caller's transaction (a database-side operation calls it inside itself): actor, action name, target server (optional), before, after; the entry ID, occurred at and origin server are filled by the database on every insert, never taken from the caller | none | whatever the transaction reports; the caller's action fails with it |
+| record | inside the caller's transaction (a database-side operation calls it inside itself): actor, action name, target server (optional), before, after, and the confirmed findings (optional); for an operator-account actor, the credential (kind, identifier, label), the source address and the reached server, taken from the actor; for a sign-in principal, its source address and reached server; for an entry about a sign-in attempt, the attempt's bound source address and the server it began on, given as inputs; the entry ID, occurred at and origin server are filled by the database on every insert, never taken from the caller | none | whatever the transaction reports; the caller's action fails with it |
 | list | actor; optional filters: action name, target server, time range; a page size; a cursor (the entry ID to continue below, or none for the newest) | entries in descending entry ID, and the cursor for the next page | Denied, Invalid (page size out of bounds), Unavailable |
 
 `list` requires `audit.read` through access-control v1; any error from that check is Denied.
@@ -28,7 +28,7 @@ passes "changed" for a secret value).
 Consumed: access-control v1; database-access v1.
 
 ## Data model
-Serves: ADV-001
+Serves: ADV-001, ADV-002
 **Audit entry**, append-only: no operation of any subsystem updates or deletes one, and no
 server login is granted the right to.
 
@@ -36,12 +36,15 @@ server login is granted the right to.
 |---|---|
 | entry ID | increasing identifier, the key |
 | occurred at | the database clock |
-| actor kind | `sysop-account`, `local-operator`, `first-run-operator`, or `engine` (for an entry the engine writes on its own initiative: a start, a fault, a revocation) |
-| actor reference | by kind: `sysop-account`, the account; `local-operator`, the server ID acted for; `first-run-operator`, empty; `engine`, the server ID of the process |
+| actor kind | `account`, `unknown-account` (a sign-in whose typed name resolved to no account), `local-operator`, `first-run-operator`, or `engine` (for an entry the engine writes on its own initiative: a start, a fault, a revocation) |
+| actor reference | by kind: `account`, the account; `unknown-account`, empty, and never the name typed; `local-operator`, the server ID acted for; `first-run-operator`, empty; `engine`, the server ID of the process |
 | origin server | the server bound to the login the action ran under; empty under the administrator credential |
 | action | a name declared by the subsystem that owns the action |
 | target server | the server acted upon, if any |
 | before, after | the values the action changed, as the owning subsystem defines them |
+| credential kind, credential ID, credential label | for an action through admin-api: `interactive`, `console` or `automation`, its identifier, and the automation token's name or the console device's name and key fingerprint; empty otherwise; never a secret |
+| source address, reached server | for an action through admin-api: the source address admin-api judged the request by, and the server the tool reached (for a relayed action, the requesting server, while origin server is the target); for an entry about a sign-in attempt, the attempt's bound address and the server it began on; empty otherwise |
+| confirmed findings | the loosening findings the actor confirmed for this change; empty when there were none |
 
 ## Behaviour
 Serves: ADV-001
@@ -87,7 +90,7 @@ Serves: ADV-001
 | an entry's actor | a holder of any server login | forge an entry naming another actor | accepted: the actor is asserted by a program the board trusts as a server; the origin server, the entry ID and the time are filled by the database, so a forged entry names the server it came from | n/a |
 
 ## Negative tests
-Serves: ADV-001
+Serves: ADV-001, ADV-002
 - An action whose `record` is forced to fail → the action is rolled back; nothing changed.
 - `list` with access control forced to error → Denied.
 - `list` by an actor without the permission → Denied.
@@ -97,6 +100,10 @@ Serves: ADV-001
   or a time → the stored entry carries A, the database's next ID and the database clock.
 - `list` with page size 0 or 1,001 → Invalid.
 - Two pages with the cursor, with no writer between them → no entry repeated or skipped.
+- `record` with a credential, a source address, a reached server and confirmed findings → the
+  entry holds them as given; with none → the fields are empty.
 
 ## Revision history
 - 2026-09-23: created for ADV-001.
+- 2026-09-23: the credential, source address, reached server and confirmed findings fields for
+  ADV-002.

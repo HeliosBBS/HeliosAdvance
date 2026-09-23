@@ -1,5 +1,5 @@
 # Database access
-Serves: ADV-001
+Serves: ADV-001, ADV-002
 
 ## Purpose
 Serves: ADV-001
@@ -16,7 +16,7 @@ As the glossary defines them: bootstrap record, key-encryption key, loopback add
 socket, operation deadline.
 
 ## Contracts
-Serves: ADV-001
+Serves: ADV-001, ADV-002
 Provided, **database-access v1**, to every subsystem and program:
 
 | Operation | Inputs | Outputs | Errors |
@@ -32,16 +32,10 @@ Provided, **database-access v1**, to every subsystem and program:
 | recordFields | none | the record's non-secret fields: server ID, database address, transport, trust-anchor fingerprint, login name, record version | Fatal |
 | writeRecord | the setup tool only: the fields to change | none | Fatal (cannot write at the required tier), Invalid (transport invalid for the address) |
 
-The graphical runtime configuration tool carries its own implementation of `open`,
-`transaction`, `now`, `seal`, `unseal`, `reachable` and `recordFields`; it never calls
-`openWith`, `lockBoard` or `writeRecord`, and never writes the record. It reads the same record
-at the same protection tier, makes the same transport decision from the same table, and maps
-failures to the same classes; the negative tests below run against it as against the engine's.
-
 Consumed: none.
 
 ## Data model
-Serves: ADV-001
+Serves: ADV-001, ADV-002
 The **bootstrap record**, one per server host:
 
 | Field | Meaning |
@@ -85,9 +79,9 @@ Protection tier, by host, and who can run each program under it:
 
 | Host | Tier | Who can read | Programs |
 |---|---|---|---|
-| Windows | encrypted by the operating system's per-machine data protection | the service account and members of the host's Administrators group | the engine as the service account; the setup tool and the runtime configuration tools as an administrator |
-| Linux, with a credential store in the service manager | held in that store | the service, and the host's superuser | the engine as the service; the setup tool and the runtime configuration tools as the superuser |
-| any other | a file with permissions for one account | the service account, and the host's superuser | the engine as the service account; the setup tool as the superuser; the runtime configuration tools as the service account or the superuser |
+| Windows | encrypted by the operating system's per-machine data protection | the service account and members of the host's Administrators group | the engine as the service account; the setup tool as an administrator |
+| Linux, with a credential store in the service manager | held in that store | the service, and the host's superuser | the engine as the service; the setup tool as the superuser |
+| any other | a file with permissions for one account | the service account, and the host's superuser | the engine as the service account; the setup tool as the superuser |
 
 A program refuses to start (Fatal) when the record is missing, malformed, or readable by any
 account other than those listed for its tier, and the setup tool reports which tier it used.
@@ -182,8 +176,7 @@ Serves: ADV-001
 | logs, errors, screens | anyone who reads them | learn a secret | the login secret, the key-encryption key and any unsealed value are never written to a log, an error message, an audit entry or a tool screen | none needed |
 
 ## Negative tests
-Serves: ADV-001
-Each runs against every implementation of the contract.
+Serves: ADV-001, ADV-002
 
 - Record readable by an account outside its tier → the program does not start; the fault is
   named.
@@ -212,3 +205,5 @@ Each runs against every implementation of the contract.
 - 2026-09-23: created for ADV-001.
 - 2026-09-23: the graphical runtime configuration tool's own implementation, and the negative
   tests as the test of every implementation.
+- 2026-09-23: the graphical tool's own implementation removed for ADV-002; the runtime
+  configuration tools no longer read the record.
