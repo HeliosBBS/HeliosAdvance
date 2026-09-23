@@ -1,0 +1,15 @@
+# Read from the default branch (main); updates target development.
+version: 2
+updates:
+  - package-ecosystem: gomod
+    directory: /
+    target-branch: development
+    schedule:
+      interval: weekly
+    labels: [kind:infra, P3]
+  - package-ecosystem: github-actions
+    directory: /
+    target-branch: development
+    schedule:
+      interval: weekly
+    labels: [kind:infra, P3]
