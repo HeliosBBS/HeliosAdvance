@@ -33,7 +33,8 @@ off who's-online.
 
 - When a server is configured with a node count, the system shall assign it a contiguous
   range of board-wide node numbers following the ranges already assigned, and shall keep that
-  range until the sysop re-plans the layout.
+  range's start and position until the sysop re-plans the layout; a count change acts on that
+  server's range alone and never moves another server's numbers.
 - If the sysop re-plans the layout while a caller is on an affected node, then the system
   shall refuse the re-plan and say which nodes are in use.
 - When a caller logs in on a server with a free node, the system shall give them the lowest
@@ -89,9 +90,11 @@ off who's-online.
    safely. Fails closed: a server that cannot establish TLS does not start.
 2. **The database credentials are the board's root of trust.** Attacker: whoever obtains them.
    Abuse: they are a server, with everything a server can do. Decision: this feature does not
-   weaken that; the join feature is the only gate that hands them out, a server's local file
-   holds nothing beyond its bootstrap record, and removing a server revokes its own database
-   login. Why:
+   weaken that; first-run setup (which creates the board and its first login with the
+   database administrator's credential, supplied once by the local operator and never stored
+   or logged) and the join feature are the only gates that hand them out, a server's local
+   file holds nothing beyond its bootstrap record, and removing a server revokes its own
+   database login. Why:
    one trust boundary, guarded once. Fails closed: no credentials, no server.
 3. **A misbehaving or misconfigured server.** Attacker: a server that lies about its node
    count, renews a lease it should not, or claims nodes outside its range. Abuse: exhausting
