@@ -37,8 +37,8 @@ server login is granted the right to.
 | entry ID | increasing identifier, the key |
 | occurred at | the database clock |
 | actor kind | `sysop-account`, `local-operator`, `first-run-operator`, or `engine` (for an entry the engine writes on its own initiative: a start, a fault, a revocation) |
-| actor reference | the account, or the server ID the local operator acted for |
-| origin server | the server the action ran on, if any |
+| actor reference | by kind: `sysop-account`, the account; `local-operator`, the server ID acted for; `first-run-operator`, empty; `engine`, the server ID of the process |
+| origin server | the server bound to the login the action ran under; empty under the administrator credential |
 | action | a name declared by the subsystem that owns the action |
 | target server | the server acted upon, if any |
 | before, after | the values the action changed, as the owning subsystem defines them |

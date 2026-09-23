@@ -102,15 +102,16 @@ realised by the stack:
     rights. Every one that an operator action reaches directly takes the actor as an input,
     checks its preconditions against row state or the calling connection, and records its
     own audit entry through audit v1 inside itself, naming the actor it was given and, as
-    origin server, the server bound to the login that called it (cluster's Login entity);
-    one reached only from inside another operation is recorded by that operation. A
-    mistaken or forged call therefore cannot corrupt the layout or mint an unrecorded login,
+    origin server, the server bound to the login that called it (cluster's Login entity;
+    empty under the administrator credential); one reached only from inside another
+    operation is recorded by that operation, and one reached both ways records its own
+    entry in both cases. A mistaken or forged call therefore cannot corrupt the layout or mint an unrecorded login,
     and what it did is on the record. They are the layout operations (createBoard, addServer,
-    setNodeCount, applyReplan, removeServer and removal's completion), the settings writes
+    setNodeCount, applyReplan, removeServer and completeRemoval), the settings writes
     (`writeSetting`, which configuration's `set` and `setWithin` reach, and `initWithin`),
-    cluster's login operations, and applyChanges, which
-    alone runs only under the administrator credential. Any server login may call the
-    others: a server holding a login can therefore run a registry operation directly, past
+    cluster's login operations, and applyChanges and
+    resetSecret, which run only under the administrator credential. Any server login may
+    call the others: a server holding a login can therefore run a registry operation directly, past
     the access-control gate, which is the trust the brief grants a server login; the gate
     bounds the tools and the sysop, and the entry names where the call came from.
     Validating a setting's value against its declaration is the tools' job, not the

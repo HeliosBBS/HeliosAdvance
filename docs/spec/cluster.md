@@ -77,7 +77,7 @@ limit bounds) inside the database, and their Invalid comes from there.
 createBoard recovers a first run whose record write failed: when a board exists whose first
 server has never acquired a lease, and the caller presents the same key identifier, address
 and transport that were stored, it returns the same server ID with a new secret (through
-`resetSecret`) and records `board.recover`; any other input while a board exists is Refused. Starting and stopping a server are the host's service manager's operations, run by
+the step resetSecret uses, without its entry) and records `board.recover`; any other input while a board exists is Refused. Starting and stopping a server are the host's service manager's operations, run by
 the local operator directly or through the setup tool; no board operation stops a server.
 `cluster.node_count` is not a registry setting: the Server detail screen reads it from
 listServers and changes it through setNodeCount.
@@ -191,8 +191,9 @@ requires.
 **Login operations**, database-side, each refusing unless its precondition, a fact of row
 state or of the calling connection, holds. createLogin, disableLogin and revokeLogin are
 reached only from inside a layout operation or removal's completion, which records the
-entry; resetSecret, reached directly, takes the actor and records `login.reset` itself,
-and reached from inside createBoard's recovery is recorded by `board.recover` alone:
+entry; resetSecret takes the actor and always records `login.reset`, and createBoard's
+recovery issues its secret through the same internal step without resetSecret, so it records
+`board.recover` alone:
 
 | Operation | Precondition the database checks | Does |
 |---|---|---|
@@ -277,7 +278,7 @@ order:
    active server, or is the server whose login carries this transaction; status `removing`;
    the node rows deleted; the lease cleared; the normalised name cleared; every login
    `listLogins` reports for that server disabled through `disableLogin` in the same
-   transaction; the audit entry. Second, the removal's completion, a database-side operation
+   transaction; the audit entry. Second, `completeRemoval`, a database-side operation
    refused unless the target's status is `removing`, in its own transaction after any server's
    renewal reads back the target: `revokeLogin` for each of its logins, recording
    `login.revoke` for each, then status `removed`; retried until it succeeds. `listServers` shows `removing` until it is done.
@@ -510,7 +511,7 @@ architecture's negative tests describe.
 28. Drain from a stale process while a successor holds the lease → zero rows; the successor's lease and occupied nodes untouched.
 29. Remove a server → its sessions end within one renewal interval and it reaches Refused ("removed"); its node rows are gone and its server row reads `removed` once the second step has run; its login is disabled in the transaction; another server's next renewal runs the second step, after which an already-open connection of that login fails its next statement and a new login attempt is rejected; a later add never receives its ID.
 30. Remove with disabling the login forced to fail → Refused; the server still active. Remove with the second step's revocation forced to fail → status `removing`; another server's renewal completes it once the fault is lifted.
-30a. Under server A's login through the harness: a Login row inserted, changed or deleted directly, `createLogin` naming A itself or active server B (each already bound to an active Login row), `disableLogin` for active B, `revokeLogin` for active B, and `resetSecret` for B → each rejected by the database, and B keeps serving through its next renewal; removeServer(B) called directly under A's login → succeeds, and `server.remove` names A as origin server. After renewals on every server, the administrator credential still authenticates and `listLogins` reports only the logins createLogin made.
+30a. Under server A's login through the harness: a Login row inserted, changed or deleted directly, `createLogin` naming A itself or active server B (each already bound to an active Login row), `disableLogin` for active B, `revokeLogin` for active B, `completeRemoval` for active B, and `resetSecret` for B and for A itself → each rejected by the database; B keeps serving through its next renewal and A's login still authenticates; removeServer(B) called directly under A's login → succeeds, and `server.remove` names A as origin server. After renewals on every server, the administrator credential still authenticates and `listLogins` reports only the logins createLogin made.
 30b. A direct `writeSetting` and a direct `setNodeCount` under server A's login, past the tools → each leaves exactly one audit entry naming the actor given and A as origin server.
 31. Remove the last active server → Refused. Remove the server whose login carries the operation → Refused.
 32. Remove an already removed server → Refused; one audit entry only.
@@ -528,8 +529,8 @@ architecture's negative tests describe.
 44. A clock gap longer than the timeout (injected) → the lease treated as lost at the next checkpoint.
 45. Release twice for one session → both succeed; the node is free once.
 46. A host stop → the server drains, `server.stop` is audited with cause `host stop` and actor kind `engine`, and the process exits with the no-restart code; a host stop with the database unreachable → the drain writes nothing, the process exits at the local deadline; a process start → `server.start` at its first acquisition with actor kind `engine`; the process killed through the harness, then restarted → `server.start` with no `server.stop` before it, and no entry naming the local operator.
-47. createBoard when a board exists whose first server has acquired a lease → Refused; when its first server never acquired and the same key identifier, address and transport are presented → the same server ID and a new secret, `board.recover` audited as the only entry; with a different key identifier → Refused; two concurrent first runs against an empty database → one succeeds, the other Conflict at applyChanges or Refused ("a board exists") at createBoard, and one board exists.
-48. The setup tool changes the record's trust anchor, or resets only the secret, then the engine restarts → `server.record.change` is written at acquisition (the fingerprint before and after, or "secret changed" with no value; the reset also left one `login.reset` entry before the restart); with audit forced to fail, the acquisition fails; a first acquisition after createBoard or addServer with an unchanged record writes `server.start` and no `server.record.change`; the same record changed before the second acquisition → `server.record.change`.
+47. createBoard when a board exists whose first server has acquired a lease → Refused; when its first server never acquired and the same key identifier, address and transport are presented → the same server ID and a new secret, `board.recover` audited as the only entry, with actor kind `first-run-operator`, an empty actor reference and no origin server; with a different key identifier → Refused; two concurrent first runs against an empty database → one succeeds, the other Conflict at applyChanges or Refused ("a board exists") at createBoard, and one board exists.
+48. The setup tool changes the record's trust anchor, or resets only the secret, then the engine restarts → `server.record.change` is written at acquisition (the fingerprint before and after, or "secret changed" with no value; the reset also left one `login.reset` entry before the restart: actor kind `first-run-operator`, target server this server, no origin server); with audit forced to fail, the acquisition fails; a first acquisition after createBoard or addServer with an unchanged record writes `server.start` and no `server.record.change`; the same record changed before the second acquisition → `server.record.change`.
 48a. A record whose key identifier is not the board's → acquisition Refused ("wrong board key").
 49. Conflict from contention on renewal (injected) → retried within the interval; no session ends.
 50. Two servers named "Alpha" and "alpha" → the second addServer is Conflict.

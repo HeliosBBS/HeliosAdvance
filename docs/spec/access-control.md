@@ -62,6 +62,8 @@ Serves: ADV-001
 | `board.create`, `board.upgrade` or `login.reset` for any principal but the first-run operator | Denied |
 | a permission the actor holds for server N; target server N | allowed |
 | a permission the actor holds for server N; target server M, or no target | Denied |
+| a targeted permission whose holder is bound to no server (a sysop account, the first-run operator); any named target | allowed |
+| a targeted permission whose holder is bound to no server; no target | Denied |
 | a permission the actor does not hold | Denied |
 | an unknown permission name, or an unknown principal kind | Denied |
 | the check cannot complete: Unavailable, or sessions v1 or accounts v1 errors or cannot vouch | Denied |
@@ -98,6 +100,8 @@ Serves: ADV-001
 Serves: ADV-001
 - The local operator of server A asking `server.connectivity` for server B → Denied.
 - The local operator asking `server.connectivity` with no target → Denied.
+- The first-run operator asking `login.reset` with no target → Denied; a sysop account asking
+  `server.connectivity` with no target → Denied.
 - The local operator asking `board.administer` → Denied.
 - A sysop account, a caller, or a local operator asking `board.create`, `board.upgrade` or
   `login.reset` → Denied.

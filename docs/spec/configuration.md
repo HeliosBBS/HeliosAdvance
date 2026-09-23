@@ -27,6 +27,7 @@ Provided, **configuration v1**:
 | read | inside a caller's transaction: key, target server | the stored value; the default when none is stored, or when the stored value fails the declared validation | NotFound |
 | setWithin | inside a caller's transaction: actor, key, target server, value | the value stored; takes the settings state hold if the caller has not; records its own entry | whatever the transaction reports |
 | initWithin | inside createBoard's transaction | the settings state row, created | Conflict (exists) |
+| writeSetting | the database-side write that `set` and `setWithin` reach: actor, key, target server, value | the value stored | Conflict, Unavailable |
 | list | actor, target server | every declared key with its kind, scope, apply mode, default and the stored value for that target (a secret value withheld; a stored value failing validation flagged as invalid) | Denied, Unavailable |
 
 Gate for `set` and `list`, through access-control v1: `board.administer`; or
@@ -39,7 +40,7 @@ itself raises no Invalid or NotFound, and a caller of `setWithin` checks the rul
 key it writes (the layout operations check the HTTP limit's bounds inside themselves). The engine calls cluster.registry v1 `markStarted` once after its
 first snapshot load.
 
-Consumed: access-control v1; audit v1 (every `set` and `setWithin` records
+Consumed: access-control v1; audit v1 (every `writeSetting` records
 `setting.change`); database-access v1 (transactions, `seal` and `unseal` for secret values).
 
 ## Data model
@@ -55,19 +56,18 @@ Serves: ADV-001
 
 Key: (key, scope server). An absent row means the declared default.
 
-**Settings state**, exactly one row: `settings version`, an integer increased by every `set`,
+**Settings state**, exactly one row: `settings version`, an integer increased by every `writeSetting`,
 so that a server can tell whether its snapshot is behind.
 
-`set` is one transaction, taking holds in the global order: exclusive hold on the settings
+`writeSetting` runs in the caller's transaction (`set` opens one of its own; `setWithin` is
+the call from inside another operation), taking holds in the global order: exclusive hold on the settings
 state row; then the setting row, held exclusively if present or created if absent (two
 concurrent creates of one absent row race on the uniqueness constraint; the loser gets
 Conflict and retries once, a fixed backstop, then reports Conflict); read the value it
 replaces; write the new value (sealed if secret); increase the settings version; stamp the
 row; record the audit entry with the replaced and stored values, or "changed" for a secret.
 Two sysops changing one existing key: the second waits for the first, and each entry records
-the value it truly replaced. `setWithin` does the same inside the caller's transaction. The
-database-side write is `writeSetting`, which `set` reaches from the process and `setWithin`
-from inside another operation; it and `initWithin` are database-side operations (the
+the value it truly replaced. `writeSetting` and `initWithin` are database-side operations (the
 architecture's login tiers):
 a server login's direct write to a setting row or the settings state row is refused by the
 database, so every stored value carries its entry and moved the settings version.
@@ -114,7 +114,7 @@ inside cluster's renewal.
 Serves: ADV-001
 | Action | When | Before | After |
 |---|---|---|---|
-| `setting.change` | every `set` and `setWithin` | the value replaced ("changed" for a secret) | the value stored ("changed" for a secret), the key, the scope server |
+| `setting.change` | every `writeSetting`, whether reached through `set`, `setWithin` or directly | the value replaced ("changed" for a secret) | the value stored ("changed" for a secret), the key, the scope server |
 
 ## Configuration
 Serves: ADV-001
