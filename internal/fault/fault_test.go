@@ -9,56 +9,44 @@ import (
 
 func TestClassOf(t *testing.T) {
 	t.Parallel()
-
 	tests := []struct {
-		name  string
-		err   error
-		class Class
+		name string
+		err  error
+		want Class
 	}{
 		{"nil", nil, None},
-		{"unwrapped stdlib error", errors.New("something"), None},
-		{"Unavailable direct", Unavailable, UnavailableClass},
-		{"Conflict direct", Conflict, ConflictClass},
-		{"Refused direct", Refused, RefusedClass},
-		{"Invalid direct", Invalid, InvalidClass},
-		{"Denied direct", Denied, DeniedClass},
-		{"NotFound direct", NotFound, NotFoundClass},
-		{"Fatal direct", Fatal, FatalClass},
-		{"Unavailable wrapped with %w", fmt.Errorf("context: %w", Unavailable), UnavailableClass},
-		{"Invalid wrapped with %w", fmt.Errorf("context: %w", Invalid), InvalidClass},
-		{"Denied wrapped with %w", fmt.Errorf("context: %w", Denied), DeniedClass},
-		{"Fatal wrapped with %w", fmt.Errorf("context: %w", Fatal), FatalClass},
-		{"Conflict wrapped twice with %w", fmt.Errorf("outer: %w", fmt.Errorf("inner: %w", Conflict)), ConflictClass},
-		{"Unavailable wrapped once with errors.Join", errors.Join(errors.New("context"), Unavailable), UnavailableClass},
-		{"Invalid wrapped with errors.Join", errors.Join(Invalid), InvalidClass},
-		{"Denied wrapped with errors.Join", errors.Join(errors.New("x"), Denied), DeniedClass},
-		{"Fatal wrapped with errors.Join", errors.Join(errors.New("x"), errors.New("y"), Fatal), FatalClass},
-		{"Conflict wrapped twice with errors.Join", errors.Join(errors.New("a"), errors.Join(errors.New("b"), Conflict)), ConflictClass},
-		{"first class found wins: Refused before Invalid", errors.Join(errors.New("x"), errors.Join(Refused, Invalid)), RefusedClass},
-		{"first class found wins: NotFound before Fatal", errors.Join(NotFound, Fatal, errors.New("info")), NotFoundClass},
-		{"breadth-first: Refused found before Invalid in Join", errors.Join(fmt.Errorf("c: %w", Refused), Invalid), RefusedClass},
-		{"all foreign errors", errors.Join(errors.New("a"), fmt.Errorf("b: %w", io.EOF)), None},
+		{"foreign error", errors.New("x"), None},
+		{"join of foreign errors", errors.Join(errors.New("a"), fmt.Errorf("b: %w", io.EOF)), None},
+		{"Unavailable direct", Unavailable, Unavailable},
+		{"Unavailable wrapped", fmt.Errorf("renew: %w", Unavailable), Unavailable},
+		{"Conflict wrapped twice", fmt.Errorf("outer: %w", fmt.Errorf("inner: %w", Conflict)), Conflict},
+		{"Refused joined", errors.Join(errors.New("context"), Refused), Refused},
+		{"Invalid wrapped inside a join", errors.Join(errors.New("a"), fmt.Errorf("b: %w", Invalid)), Invalid},
+		{"Denied wrapped", fmt.Errorf("gate: %w", Denied), Denied},
+		{"NotFound joined", errors.Join(errors.New("x"), NotFound), NotFound},
+		{"Fatal wrapped", fmt.Errorf("start: %w", Fatal), Fatal},
+		{"first found wins when the later-declared class comes first", errors.Join(Fatal, Unavailable), Fatal},
+		{"first found wins when the earlier-declared class comes first", errors.Join(Refused, Invalid), Refused},
+		{"depth-first: a wrapped class before a bare one later in the join", errors.Join(fmt.Errorf("c: %w", Denied), Conflict), Denied},
+		{"depth-first through two %w verbs", fmt.Errorf("%w %w", fmt.Errorf("x: %w", NotFound), Refused), NotFound},
 	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			got := ClassOf(tt.err)
-			if got != tt.class {
-				t.Errorf("ClassOf(%v) = %v, want %v", tt.err, got, tt.class)
+			if got := ClassOf(tc.err); got != tc.want {
+				t.Fatalf("ClassOf(%v) = %q, want %q", tc.err, got, tc.want)
 			}
 		})
 	}
 }
 
-func TestErrorsIsWithSentinels(t *testing.T) {
+func TestErrorsIsThroughAWrap(t *testing.T) {
 	t.Parallel()
-
-	wrapped := fmt.Errorf("operation failed: %w", Unavailable)
-	if !errors.Is(wrapped, Unavailable) {
-		t.Errorf("errors.Is(fmt.Errorf with Unavailable, Unavailable) = false, want true")
+	err := fmt.Errorf("renew: %w", Unavailable)
+	if !errors.Is(err, Unavailable) {
+		t.Fatal("errors.Is does not find the wrapped sentinel")
 	}
-	if errors.Is(wrapped, Conflict) {
-		t.Errorf("errors.Is(fmt.Errorf with Unavailable, Conflict) = true, want false")
+	if errors.Is(err, Conflict) {
+		t.Fatal("errors.Is matched a sentinel that is not in the chain")
 	}
 }

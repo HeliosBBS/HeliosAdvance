@@ -1,48 +1,32 @@
+// Package fault holds the error classes every contract uses.
 package fault
 
 import "errors"
 
-type Class int
+// Class is an error class, and a sentinel is a Class: a caller wraps one with %w and
+// checks it with errors.Is, and a boundary that sees a foreign error is what classifies
+// it. Typed constants cannot be reassigned by another package.
+type Class string
 
 const (
-	None Class = iota
-	UnavailableClass
-	ConflictClass
-	RefusedClass
-	InvalidClass
-	DeniedClass
-	NotFoundClass
-	FatalClass
+	None        Class = ""
+	Unavailable Class = "unavailable"
+	Conflict    Class = "conflict"
+	Refused     Class = "refused"
+	Invalid     Class = "invalid"
+	Denied      Class = "denied"
+	NotFound    Class = "not found"
+	Fatal       Class = "fatal"
 )
 
-type classError struct {
-	class Class
-	text  string
-}
+func (c Class) Error() string { return string(c) }
 
-func (e classError) Error() string {
-	return e.text
-}
-
-var (
-	Unavailable error = classError{UnavailableClass, "unavailable"}
-	Conflict    error = classError{ConflictClass, "conflict"}
-	Refused     error = classError{RefusedClass, "refused"}
-	Invalid     error = classError{InvalidClass, "invalid"}
-	Denied      error = classError{DeniedClass, "denied"}
-	NotFound    error = classError{NotFoundClass, "not found"}
-	Fatal       error = classError{FatalClass, "fatal"}
-)
-
-// ClassOf returns the class of an error by walking its wrap chain.
-// An error carries a class only by wrapping one of the exported sentinels
-// (Unavailable, Conflict, Refused, Invalid, Denied, NotFound, Fatal) with
-// fmt.Errorf("%w", ...) or errors.Join(...). If multiple classes are wrapped,
-// ClassOf returns the first found in depth-first order.
+// ClassOf is the first class in a depth-first walk of the wrap chain, or None when the
+// chain carries none; no class takes precedence over another.
 func ClassOf(err error) Class {
-	var ce classError
-	if errors.As(err, &ce) {
-		return ce.class
+	var c Class
+	if errors.As(err, &c) {
+		return c
 	}
 	return None
 }
