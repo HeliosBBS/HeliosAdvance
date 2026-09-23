@@ -23,9 +23,6 @@ func (c Class) Error() string { return string(c) }
 // when the chain carries none; no class takes precedence over another. A wrapped None
 // does not hide a real class found elsewhere in the chain.
 func ClassOf(err error) Class {
-	if err == nil {
-		return None
-	}
 	if c, ok := err.(Class); ok {
 		return c
 	}
