@@ -119,7 +119,9 @@ verified work uncommitted or unpushed.
   and an SBOM.
 - **Lang strings** use named tags (`{TAG_NAME}`), never positional arguments.
 - **Refactor on discovering an architectural flaw** rather than building on it.
-- **Questions:** one at a time. **Pushback:** with reasoning, never an echo.
+- **Questions:** one at a time. **No echo chamber:** when the developer is wrong, or you
+  would have chosen differently, say so with the reasoning before doing what was asked;
+  agreement without a reason is worthless. A decision repeated after the objection stands.
 
 ## Bug classes to check explicitly
 
