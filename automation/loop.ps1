@@ -4,14 +4,16 @@ The unattended loop: one issue task per iteration, fresh context, as the organis
 GitHub App. Reads loop.local.json beside this script (gitignored):
   { "appId": 0, "installationId": 0, "keyPath": "...pem", "base": "D:\\GitRepos\\Claude" }
 Run attended first:  .\loop.ps1 -Once
+Stop a running or scheduled loop:  New-Item <base>\state\stop-requested
+On a usage limit the loop schedules itself for the reset time as a Windows scheduled task.
 #>
 param(
     [string]$Repo = "HeliosAdvance",
     [string]$Owner = "HeliosBBS",
     [switch]$Once,
     [int]$MaxIterations = 50,
-    [string]$Model = "sonnet",
-    [string]$EscalationModel = "opus"
+    [int]$MaxConsecutiveFailures = 3,
+    [string]$TaskName = "HeliosLoop"
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
@@ -23,6 +25,9 @@ $email = "$($config.appId)+phaethusa[bot]@users.noreply.github.com"
 $repoDir = Join-Path $base $Repo
 $wikiDir = Join-Path $base "$Repo.wiki"
 $stateDir = Join-Path $base "state" $Repo
+$stopFile = Join-Path $base "state" "stop-requested"
+$loopStateFile = Join-Path $base "state" "loop.json"
+$tiers = @("haiku", "sonnet", "opus")
 $null = New-Item -ItemType Directory -Force $base, $stateDir
 
 function Log([string]$message) { Write-Host "[loop $(Get-Date -Format HH:mm:ss)] $message" }
@@ -57,7 +62,7 @@ function Invoke-Git { param([string]$dir, [Parameter(ValueFromRemainingArguments
 function Ensure-Clone([string]$dir, [string]$url) {
     if (-not (Test-Path (Join-Path $dir ".git"))) {
         Log "cloning $url"
-        & git clone --quiet $url $dir 2>&1 | Out-Null
+        & git.exe clone --quiet $url $dir 2>&1 | Out-Null
         if ($LASTEXITCODE -ne 0) { throw "clone of $url failed" }
     }
     Invoke-Git $dir config user.name $identity | Out-Null
@@ -86,6 +91,81 @@ function Read-State([int]$number) {
 function Write-State([int]$number, $state) {
     $state | ConvertTo-Json -Depth 5 | Set-Content (Join-Path $stateDir "$number.json")
 }
+
+function Read-LoopState {
+    if (Test-Path $loopStateFile) { Get-Content $loopStateFile -Raw | ConvertFrom-Json }
+    else { [pscustomobject]@{ consecutiveFailures = 0 } }
+}
+
+function Write-LoopState($state) { $state | ConvertTo-Json | Set-Content $loopStateFile }
+
+# The next unticked task's tier decides the model; session-tier work is not the loop's.
+function Get-TaskTier([string]$body) {
+    $in = $false
+    foreach ($line in $body -split "`n") {
+        $t = $line.Trim()
+        if ($t.StartsWith("### ")) { $in = ($t -eq "### Plan"); continue }
+        if ($in -and $t.StartsWith("- [ ]")) {
+            if ($t -match '\[tier:\s*(haiku|sonnet|opus|session)\]') { return $Matches[1] }
+            return "sonnet"
+        }
+    }
+    "sonnet"
+}
+
+function Next-Tier([string]$tier) {
+    $i = [array]::IndexOf($tiers, $tier)
+    if ($i -lt 0 -or $i -ge $tiers.Count - 1) { return $null }
+    $tiers[$i + 1]
+}
+
+# ---- usage limits: parse the reset time out of the message and come back then ----
+# "Aug 18, 11pm" is year-less and bare Parse misreads the hour as a two-digit year,
+# so the explicit shapes are tried first.
+function Get-ResetDateTime([string]$text) {
+    $m = [regex]::Match($text, '(?im)(?:reached|hit).*?limit.*?resets?(?:\s+at)?\s+(?<reset>[^()\r\n]+?)(?:\s*\([^)]+\))?[.\s]*$')
+    if (-not $m.Success) { return $null }
+    $resetText = $m.Groups['reset'].Value.Trim()
+    $now = Get-Date
+    $culture = [System.Globalization.CultureInfo]::InvariantCulture
+    $parsed = $null
+    foreach ($fmt in @('htt', 'h:mmtt', 'HH:mm')) {
+        try { $parsed = $now.Date + [datetime]::ParseExact($resetText, $fmt, $culture).TimeOfDay; break } catch { }
+    }
+    if (-not $parsed) {
+        foreach ($fmt in @('MMM d, htt', 'MMM d, h:mmtt', 'MMMM d, htt', 'MMMM d, h:mmtt')) {
+            try { $parsed = [datetime]::ParseExact("$resetText $($now.Year)", "$fmt yyyy", $culture); break } catch { }
+        }
+    }
+    if (-not $parsed) { try { $parsed = [datetime]::Parse($resetText, $culture) } catch { return $null } }
+    if ($parsed -le $now -and $parsed -gt $now.AddDays(-1)) { $parsed = $parsed.AddDays(1) }
+    if ($parsed -le $now -or $parsed -gt $now.AddDays(10)) { return $null }
+    $parsed
+}
+
+function Get-RetryTime([string]$text) {
+    $at = Get-ResetDateTime $text
+    if ($at) { return $at.AddMinutes(2) }
+    $now = Get-Date
+    if ($text -match '(?i)week|fable') {
+        $days = (1 + 7 - [int]$now.DayOfWeek) % 7
+        if ($days -eq 0) { $days = 7 }
+        return $now.Date.AddDays($days).AddHours(23).AddMinutes(2)
+    }
+    $now.AddHours(5).AddMinutes(2)
+}
+
+# schtasks.exe rather than the ScheduledTasks module: it works from a non-elevated
+# interactive session and survives a reboot; the task is one fixed name, replaced each time.
+function Set-RetryTask([datetime]$at) {
+    $pwsh = (Get-Process -Id $PID).Path
+    $action = "`"$pwsh`" -NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`" -Repo $Repo"
+    $out = & schtasks.exe /Create /TN $TaskName /TR $action /SC ONCE /SD $at.ToString('MM/dd/yyyy') /ST $at.ToString('HH:mm') /RL HIGHEST /IT /RU $env:USERNAME /F 2>&1
+    if ($LASTEXITCODE -eq 0) { Log "retry scheduled for $($at.ToString('yyyy-MM-dd HH:mm'))" }
+    else { Log "schtasks failed: $out" }
+}
+
+function Remove-RetryTask { & schtasks.exe /Delete /TN $TaskName /F 2>&1 | Out-Null }
 
 function Build-Prompt($issue, [string]$learnings, [string]$notes) {
     @"
@@ -129,31 +209,22 @@ function Invoke-Session([string]$dir, [string]$prompt, [string]$model, [string]$
 }
 
 function Get-Marker([string[]]$lines) {
+    $text = $lines -join "`n"
+    if ($text -match '(?im)(reached|hit)\s.*\blimit\b|usage limit|rate limit') { return @("PAUSE", $text) }
     for ($i = $lines.Count - 1; $i -ge 0; $i--) {
         $line = $lines[$i].Trim()
         if ($line -match '^LOOP:\s*(DONE|ROUTE-UP|HUMAN)\b\s*(.*)$') { return @($Matches[1], $Matches[2]) }
-        if ($line -match "usage limit|rate limit|hit your limit") { return @("PAUSE", $line) }
         if ($line) { break }
     }
     @("NONE", "")
 }
 
-# ---- main ----
-$env:GH_TOKEN = New-InstallationToken
-Ensure-Clone $repoDir "https://github.com/$Owner/$Repo.git"
-Ensure-Clone $wikiDir "https://github.com/$Owner/$Repo.wiki.git"
-Invoke-Git $repoDir fetch --quiet --prune origin | Out-Null
-Invoke-Git $repoDir checkout --quiet development | Out-Null
-Invoke-Git $repoDir reset --quiet --hard origin/development | Out-Null
-Invoke-Git $wikiDir pull --quiet --ff-only | Out-Null
-
-for ($iteration = 1; $iteration -le $MaxIterations; $iteration++) {
-    if ($iteration % 4 -eq 0) { $env:GH_TOKEN = New-InstallationToken }
+function Invoke-Iteration([int]$iteration) {
     Push-Location $repoDir
     try {
         & work refresh 2>&1 | Out-Null
         $json = & work next --loop 2>$null
-        if ($LASTEXITCODE -eq 3) { Log "nothing to do"; break }
+        if ($LASTEXITCODE -eq 3) { return "empty" }
         if ($LASTEXITCODE -ne 0) { throw "work next failed" }
     }
     finally { Pop-Location }
@@ -163,10 +234,13 @@ for ($iteration = 1; $iteration -le $MaxIterations; $iteration++) {
     if ($pick.claimed_by -ne $identity) { Push-Location $repoDir; & work claim $number | Out-Null; Pop-Location }
     Log "#${number}: $($issue.title)"
 
+    $tier = if ($pick.planned) { Get-TaskTier $issue.body } else { "sonnet" }
+    if ($tier -eq "session") { Set-Human $number "the next task is session-tier: it needs an interactive session with the developer"; return "continue" }
+
     $branch = "issue-$number-$(Slug $issue.title)"
     $worktree = Join-Path $base "$Repo.wt" $branch
     if (-not (Test-Path $worktree)) {
-        $remote = & git -C $repoDir ls-remote --heads origin $branch
+        $remote = & git.exe -C $repoDir ls-remote --heads origin $branch
         $start = if ($remote) { "origin/$branch" } else { "origin/development" }
         Invoke-Git $repoDir worktree add --quiet -B $branch $worktree $start | Out-Null
     }
@@ -183,28 +257,38 @@ for ($iteration = 1; $iteration -le $MaxIterations; $iteration++) {
             Set-Content "$log.baseline" $baseline
             Set-Human $number "make check is red on the baseline before any change; see the loop log"
             Write-State $number $state
-            if ($Once) { break } else { continue }
+            return "continue"
         }
     }
     finally { Pop-Location }
 
     $learnings = Get-Content (Join-Path $wikiDir "Learnings.md") -Raw
     $ticksBefore = ([regex]::Matches($issue.body, '- \[x\]')).Count
-    $output = Invoke-Session $worktree (Build-Prompt $issue $learnings $state.notes) $Model $log
+    Log "#${number}: running on $tier"
+    $output = Invoke-Session $worktree (Build-Prompt $issue $learnings $state.notes) $tier $log
     $marker, $detail = Get-Marker @($output)
 
     if ($marker -eq "ROUTE-UP") {
-        Log "#${number}: routing up to $EscalationModel"
-        $state.notes = $detail
-        $output = Invoke-Session $worktree (Build-Prompt $issue $learnings $state.notes) $EscalationModel "$log.escalated"
-        $marker, $detail = Get-Marker @($output)
-        if ($marker -eq "ROUTE-UP") { $marker = "HUMAN"; $detail = "failed at $EscalationModel too: $detail" }
+        $up = Next-Tier $tier
+        if ($up) {
+            Log "#${number}: routing up to $up"
+            $state.notes = $detail
+            $output = Invoke-Session $worktree (Build-Prompt $issue $learnings $state.notes) $up "$log.escalated"
+            $marker, $detail = Get-Marker @($output)
+        }
+        if ($marker -eq "ROUTE-UP") { $marker = "HUMAN"; $detail = "failed after routing up: $detail" }
+    }
+
+    if ($marker -eq "PAUSE") {
+        $state.notes = ($output | Select-Object -Last 40) -join "`n"
+        Write-State $number $state
+        return "pause:" + $detail
     }
 
     # The gutter detector: the same failing test, or the same files churned with no box ticked,
     # three iterations running; or a placeholder that passes.
     $failing = @([regex]::Matches(($output -join "`n"), '--- FAIL: (\S+)') | ForEach-Object { $_.Groups[1].Value } | Sort-Object -Unique)
-    $changed = @(& git -C $worktree diff --name-only origin/development | Sort-Object)
+    $changed = @(& git.exe -C $worktree diff --name-only origin/development | Sort-Object)
     Push-Location $repoDir; & work refresh 2>&1 | Out-Null; Pop-Location
     $after = Get-Content (Join-Path $repoDir "issues.jsonl") | ForEach-Object { $_ | ConvertFrom-Json } | Where-Object number -eq $number
     $ticked = $after -and ([regex]::Matches($after.body, '- \[x\]')).Count -gt $ticksBefore
@@ -213,7 +297,7 @@ for ($iteration = 1; $iteration -le $MaxIterations; $iteration++) {
     if ($ticked) { $state.ticks++; $state.notes = "" } else { $state.notes = ($output | Select-Object -Last 40) -join "`n" }
     $sameTest = $failing.Count -gt 0 -and $state.failingTests.Count -eq 3 -and (@($state.failingTests | ForEach-Object { $_ -join "," } | Sort-Object -Unique).Count -eq 1)
     $sameFiles = -not $ticked -and $changed.Count -gt 0 -and $state.changedFiles.Count -eq 3 -and (@($state.changedFiles | ForEach-Object { $_ -join "," } | Sort-Object -Unique).Count -eq 1)
-    $placeholder = (& git -C $worktree diff origin/development) -match 'TODO|not implemented'
+    $placeholder = (& git.exe -C $worktree diff origin/development) -match 'TODO|not implemented'
     if ($marker -ne "HUMAN" -and ($sameTest -or $sameFiles -or $placeholder)) {
         $marker = "HUMAN"
         $detail = if ($sameTest) { "the same test has failed three iterations running: $($failing -join ', ')" }
@@ -225,14 +309,51 @@ for ($iteration = 1; $iteration -le $MaxIterations; $iteration++) {
     switch ($marker) {
         "DONE"  { Log "#${number}: done for this iteration" }
         "HUMAN" { Set-Human $number $detail }
-        "PAUSE" {
+        default { Set-Human $number "the session ended without a LOOP line; see the loop log" }
+    }
+    "continue"
+}
+
+# ---- main ----
+if (Test-Path $stopFile) { Remove-RetryTask; Log "stop requested ($stopFile); not running"; exit 0 }
+Remove-RetryTask
+$loopState = Read-LoopState
+try {
+    $env:GH_TOKEN = New-InstallationToken
+    Ensure-Clone $repoDir "https://github.com/$Owner/$Repo.git"
+    Ensure-Clone $wikiDir "https://github.com/$Owner/$Repo.wiki.git"
+    Invoke-Git $repoDir fetch --quiet --prune origin | Out-Null
+    Invoke-Git $repoDir checkout --quiet development | Out-Null
+    Invoke-Git $repoDir reset --quiet --hard origin/development | Out-Null
+    Invoke-Git $wikiDir pull --quiet --ff-only | Out-Null
+
+    for ($iteration = 1; $iteration -le $MaxIterations; $iteration++) {
+        if (Test-Path $stopFile) { Log "stop requested; ending"; break }
+        if ($iteration % 4 -eq 0) { $env:GH_TOKEN = New-InstallationToken }
+        $result = Invoke-Iteration $iteration
+        $loopState.consecutiveFailures = 0
+        Write-LoopState $loopState
+        if ($result -eq "empty") { Log "nothing to do"; break }
+        if ($result.StartsWith("pause:")) {
+            $at = Get-RetryTime $result.Substring(6)
             Log "usage limit reached; state written"
-            Write-Output $detail
+            Set-RetryTask $at
+            Write-Output ($result.Substring(6) -split "`n" | Where-Object { $_ -match '(?i)limit' } | Select-Object -First 1)
             Write-Output "LOOP-PAUSE"
             exit 75
         }
-        default { Set-Human $number "the session ended without a LOOP line; see the loop log" }
+        if ($Once) { break }
     }
-    if ($Once) { break }
+    Log "loop ended"
 }
-Log "loop ended"
+catch {
+    $loopState.consecutiveFailures++
+    Write-LoopState $loopState
+    Log "unexpected error: $($_.Exception.Message)"
+    if ($loopState.consecutiveFailures -ge $MaxConsecutiveFailures) {
+        Log "$($loopState.consecutiveFailures) consecutive failures; stopping without a retry. Investigate, then run again."
+        exit 70
+    }
+    if (-not $Once) { Set-RetryTask (Get-Date).AddMinutes(15) }
+    exit 70
+}
