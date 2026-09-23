@@ -100,7 +100,7 @@ Serves: ADV-001
 |---|---|
 | reload fails | the previous snapshot stays in force |
 | access control errors | Denied |
-| audit fails | the `set` rolls back |
+| audit fails | the `writeSetting` rolls back |
 
 ## Multi-node invariants
 Serves: ADV-001

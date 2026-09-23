@@ -107,11 +107,12 @@ realised by the stack:
     operation is recorded by that operation, and one reached both ways records its own
     entry in both cases. A mistaken or forged call therefore cannot corrupt the layout or mint an unrecorded login,
     and what it did is on the record. They are the layout operations (createBoard, addServer,
-    setNodeCount, applyReplan, removeServer and completeRemoval), the settings writes
+    setNodeCount, applyReplan, removeServer), completeRemoval, the settings writes
     (`writeSetting`, which configuration's `set` and `setWithin` reach, and `initWithin`),
     cluster's login operations, and applyChanges and
     resetSecret, which run only under the administrator credential. Any server login may
-    call the others: a server holding a login can therefore run a registry operation directly, past
+    call the others, except createLogin, disableLogin and revokeLogin, which the database
+    grants to no server login (only their containing operations reach them): a server holding a login can therefore run a registry operation directly, past
     the access-control gate, which is the trust the brief grants a server login; the gate
     bounds the tools and the sysop, and the entry names where the call came from.
     Validating a setting's value against its declaration is the tools' job, not the

@@ -73,6 +73,7 @@ limit bounds) inside the database, and their Invalid comes from there.
 | applyReplan | `board.administer` | actor, expected layout version | ranges | Denied, Conflict, Refused (nodes in use), Unavailable |
 | removeServer | `board.administer` | actor, server, the server ID typed again | none | Denied, Invalid (mismatch), NotFound, Refused (already removed; the last active server; the server whose login carries this operation), Unavailable |
 | markStarted | none: not an operator action; the engine calls it once per process | the settings version of the first snapshot | none | Unavailable |
+| completeRemoval | none: not an operator action; the engine calls it after a renewal reads back a server in `removing` (actor kind `engine`) | server | none; a second run finds `removed` and writes nothing | NotFound, Refused (the server is `active`), Unavailable |
 
 createBoard recovers a first run whose record write failed: when a board exists whose first
 server has never acquired a lease, and the caller presents the same key identifier, address
@@ -278,9 +279,10 @@ order:
    active server, or is the server whose login carries this transaction; status `removing`;
    the node rows deleted; the lease cleared; the normalised name cleared; every login
    `listLogins` reports for that server disabled through `disableLogin` in the same
-   transaction; the audit entry. Second, `completeRemoval`, a database-side operation
-   refused unless the target's status is `removing`, in its own transaction after any server's
-   renewal reads back the target: `revokeLogin` for each of its logins, recording
+   transaction; the audit entry. Second, `completeRemoval` (actor kind `engine`), a database-side operation Refused for
+   an `active` target and a no-op for a `removed` one, in its own transaction after any
+   server's renewal reads back the target, holding the target's server row so that two runs
+   serialise and the second sees `removed`: `revokeLogin` for each of its logins, recording
    `login.revoke` for each, then status `removed`; retried until it succeeds. `listServers` shows `removing` until it is done.
 
 Layout rules:
@@ -414,8 +416,8 @@ deadline; the cached counts.
 
 Jobs: renewal and acquisition (a compare-and-set or a guarded acquire; a duplicate tick
 extends to the same or a later time, or finds the lease live); reconcile and queued releases
-(clear to the same empty state); pending revocations (a second server finds the login already
-revoked). There is no reaper: an expired
+(clear to the same empty state); pending revocations (the second run finds the target `removed` and
+writes nothing). There is no reaper: an expired
 server's nodes are free under the occupancy rule at the instant of expiry.
 
 ## Audit
@@ -511,7 +513,8 @@ architecture's negative tests describe.
 28. Drain from a stale process while a successor holds the lease → zero rows; the successor's lease and occupied nodes untouched.
 29. Remove a server → its sessions end within one renewal interval and it reaches Refused ("removed"); its node rows are gone and its server row reads `removed` once the second step has run; its login is disabled in the transaction; another server's next renewal runs the second step, after which an already-open connection of that login fails its next statement and a new login attempt is rejected; a later add never receives its ID.
 30. Remove with disabling the login forced to fail → Refused; the server still active. Remove with the second step's revocation forced to fail → status `removing`; another server's renewal completes it once the fault is lifted.
-30a. Under server A's login through the harness: a Login row inserted, changed or deleted directly, `createLogin` naming A itself or active server B (each already bound to an active Login row), `disableLogin` for active B, `revokeLogin` for active B, `completeRemoval` for active B, and `resetSecret` for B and for A itself → each rejected by the database; B keeps serving through its next renewal and A's login still authenticates; removeServer(B) called directly under A's login → succeeds, and `server.remove` names A as origin server. After renewals on every server, the administrator credential still authenticates and `listLogins` reports only the logins createLogin made.
+30a. Under server A's login through the harness: a Login row inserted, changed or deleted directly, `createLogin` naming A itself or active server B (each already bound to an active Login row), `disableLogin` for active B, `revokeLogin` for active B and for a server in `removing` (no server login may call these three directly), `completeRemoval` for active B, and `resetSecret` for B and for A itself → each rejected by the database; B keeps serving through its next renewal and A's login still authenticates; removeServer(B) called directly under A's login → succeeds, and `server.remove` names A as origin server. After renewals on every server, the administrator credential still authenticates and `listLogins` reports only the logins createLogin made.
+30c. Two servers running `completeRemoval` for one target at once → exactly one `login.revoke` entry per login and one `removed`; the second run writes nothing; `completeRemoval` for a `removed` server → nothing written.
 30b. A direct `writeSetting` and a direct `setNodeCount` under server A's login, past the tools → each leaves exactly one audit entry naming the actor given and A as origin server.
 31. Remove the last active server → Refused. Remove the server whose login carries the operation → Refused.
 32. Remove an already removed server → Refused; one audit entry only.

@@ -18,7 +18,7 @@ Provided, **audit v1**:
 
 | Operation | Inputs | Outputs | Errors |
 |---|---|---|---|
-| record | inside the caller's transaction (a database-side operation calls it inside itself): actor, origin server (optional), action name, target server (optional), before, after | none | whatever the transaction reports; the caller's action fails with it |
+| record | inside the caller's transaction (a database-side operation calls it inside itself): actor, action name, target server (optional), before, after; the entry ID, occurred at and origin server are filled by the database on every insert, never taken from the caller | none | whatever the transaction reports; the caller's action fails with it |
 | list | actor; optional filters: action name, target server, time range; a page size; a cursor (the entry ID to continue below, or none for the newest) | entries in descending entry ID, and the cursor for the next page | Denied, Invalid (page size out of bounds), Unavailable |
 
 `list` requires `audit.read` through access-control v1; any error from that check is Denied.
@@ -84,7 +84,7 @@ Serves: ADV-001
 |---|---|---|---|---|
 | the audit log | a sysop acting through the tools, or any program | alter or remove entries | append-only, and the database grants no server login the right to change or delete an entry | none needed |
 | the audit log | a reader without the permission | learn operator actions | `list` gated on `audit.read` | error means Denied |
-| an entry's actor | a holder of any server login | forge an entry naming another actor | accepted: the actor is asserted by a program the board trusts as a server; the entry's origin server is recorded so a forged entry names the host it came from | n/a |
+| an entry's actor | a holder of any server login | forge an entry naming another actor | accepted: the actor is asserted by a program the board trusts as a server; the origin server, the entry ID and the time are filled by the database, so a forged entry names the server it came from | n/a |
 
 ## Negative tests
 Serves: ADV-001
@@ -93,6 +93,8 @@ Serves: ADV-001
 - `list` by an actor without the permission → Denied.
 - An update or delete of an entry attempted with any server login → rejected by the
   database.
+- A direct insert under server A's login naming B as origin server, or supplying an entry ID
+  or a time → the stored entry carries A, the database's next ID and the database clock.
 - `list` with page size 0 or 1,001 → Invalid.
 - Two pages with the cursor, with no writer between them → no entry repeated or skipped.
 
