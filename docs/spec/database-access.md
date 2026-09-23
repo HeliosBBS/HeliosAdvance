@@ -62,7 +62,9 @@ host at a time. What an engine started before the upgrade does is cluster's vers
 
 A secret reset, in order: the setup tool opens a connection with `openWith` and the
 administrator credential; calls cluster's resetSecret for this server; writes the new secret
-into the record; discards the credential; restarts the engine.
+into the record; discards the credential; restarts the engine. A reset whose record write
+fails is recovered by running it again; an engine that reconnects with the old secret
+between the reset and the restart goes Fatal, and the sequence's restart starts it.
 
 The record is written by the setup tool (first run, join, and any later change the local
 operator makes to restore connectivity: address, trust anchor, transport, and the secret

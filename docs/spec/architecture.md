@@ -69,13 +69,16 @@ The database is the board's single source of truth. Properties every subsystem m
 realised by the stack:
 
 - **A transaction** groups reads and writes so that either all of them take effect or none,
-  and no other transaction sees a partial result.
+  and no other transaction sees a partial result. A data-model change takes part in a
+  transaction like any write; of two transactions creating the same entity, one commits and
+  the other is Conflict.
 - **A compare-and-set** is a write whose predicate names the values it expects; it reports
   whether it changed anything, and a check-then-act is atomic when the check is that
   predicate.
 - **Holds**, exclusive and shared, and **compare-and-set** as the glossary defines them; a
-  compare-and-set on a row waits for that row's exclusive holder and for nothing else. **The
-  cluster mutex** is an exclusive hold on the single board row.
+  compare-and-set on a row waits for that row's exclusive holder and for nothing else. A
+  login may take a shared or exclusive hold on any row it may read: a hold is not a write.
+  **The cluster mutex** is an exclusive hold on the single board row.
 - **A uniqueness constraint** rejects, inside the transaction, a second row with the same
   key; a constraint may apply to rows where a field is set and ignore rows where it is empty.
 - **The database clock** is the one time source for every stored timestamp and every
@@ -88,19 +91,21 @@ realised by the stack:
   - **A server login** is bound to one server ID. It reads everything a server needs. It
     writes directly only these fields of its own server row: lease generation, lease expires
     at, lease timeout used, engine version, operating system and processor architecture,
-    transport, database address, trust-anchor fingerprint, login name, record version,
-    started settings version, and the reported HTTP fields; and the occupant fields and claim
+    transport, database address, trust-anchor fingerprint, record version, started settings
+    version, and the reported HTTP fields; and the occupant fields and claim
     generation of the node rows it owns. It inserts audit entries, and it calls the
     database-side operations. The database refuses every other write from it: any other
     field of its own row, another server's row, a node row it does not own, any node row's
     owner or number, an inserted server or node row, the board row, a layout row, a setting
-    row, the settings state, an applied-change row, a login.
+    row, the settings state, an applied-change row, a login row.
   - **A database-side operation** runs inside the database with the data model owner's
-    rights. Every one takes the actor as an input, checks its preconditions against row
-    state, and records its own audit entry through audit v1 inside itself, naming the actor
-    it was given and, as origin server, the server whose login called it. A mistaken or
-    forged call therefore cannot corrupt the layout or mint an unrecorded login, and what it
-    did is on the record. They are the layout operations (createBoard, addServer,
+    rights. Every one that an operator action reaches directly takes the actor as an input,
+    checks its preconditions against row state or the calling connection, and records its
+    own audit entry through audit v1 inside itself, naming the actor it was given and, as
+    origin server, the server bound to the login that called it (cluster's Login entity);
+    one reached only from inside another operation is recorded by that operation. A
+    mistaken or forged call therefore cannot corrupt the layout or mint an unrecorded login,
+    and what it did is on the record. They are the layout operations (createBoard, addServer,
     setNodeCount, applyReplan, removeServer and removal's completion), the settings writes
     (`set`, `setWithin`, `initWithin`), cluster's login operations, and applyChanges, which
     alone runs only under the administrator credential. Any server login may call the
@@ -124,8 +129,8 @@ state, then server rows in ascending ID, then layout rows in ascending server ID
 setting rows in key order, then node rows in ascending number. A transaction takes holds in
 that order and never goes back.
 
-Identity sources: server IDs, audit entry IDs and applied-change IDs are increasing
-identifiers. Node numbers and layout positions are assigned by cluster's layout operations
+Identity sources: server IDs, audit entry IDs and the applied-change order are increasing
+identifiers; a change identifier is fixed by the release that ships it. Node numbers and layout positions are assigned by cluster's layout operations
 under the cluster mutex. Session identifiers come from one source, sessions v1, and are
 unpredictable and unique across servers.
 
@@ -158,8 +163,8 @@ database connection.
 Serves: ADV-001
 Every state-changing operator action writes an audit entry through audit v1, as audit's
 contract requires. An action the engine performs on the local operator's behalf without a
-transaction of its own (a change to the bootstrap record, a start) is recorded by the
-transaction that first observes it, as cluster states.
+transaction of its own (a change to the bootstrap record) is recorded by the transaction
+that first observes it, as cluster states.
 
 ## Configuration
 Serves: ADV-001

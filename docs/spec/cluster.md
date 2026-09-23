@@ -54,10 +54,12 @@ contract.
 
 **cluster.registry v1**, to the setup tool, the runtime configuration tools and join v1. Each
 operation is gated through access-control v1 as its row says; each state-changing operation
-records its audit entry through audit v1. The operations the architecture lists as
-database-side take the actor as an input, check their preconditions inside the database and
-record their own entry, so a server login calling one directly gets the same outcome as
-through a tool, less the gate.
+records its audit entry through audit v1; markStarted is not an operator action and records
+none. The operations the architecture lists as database-side take the actor as an input,
+check their preconditions inside the database and record their own entry, so a server login
+calling one directly gets the same outcome as through a tool, less the gate. The layout
+operations check their fixed rules (display-name length and characters, count bounds, HTTP
+limit bounds) inside the database, and their Invalid comes from there.
 
 | Operation | Gate | Inputs | Outputs | Errors |
 |---|---|---|---|---|
@@ -138,7 +140,7 @@ hold is the cluster mutex.
 | lease timeout used | the timeout written at the last renewal |
 | engine version | written by acquisition; read by admission's version check |
 | operating system, processor architecture | informational, written at acquisition; never branch behaviour |
-| transport, database address, trust-anchor fingerprint, login name | as createBoard or addServer stored them, then as the record held them at the last admission; compared at acquisition |
+| transport, database address, trust-anchor fingerprint | as createBoard or addServer stored them, then as the record held them at the last admission; compared at acquisition |
 | record version | empty as createBoard and addServer store it, and adopted without an entry at the first acquisition; then as the record held it at the last admission; compared at every later acquisition |
 | started settings version | written once per process by `markStarted` |
 | HTTP in use reported, reported at | written by each renewal, for the tools |
@@ -168,6 +170,16 @@ Constraints: a node number lies within its owner's range (the layout operations 
 only writers of owner and ranges); a uniqueness constraint on the occupant session where it
 is set, so one session identifier occupies at most one node.
 
+**Login**, one row per database login createLogin made; written only by the login operations
+below, never by any server login, and the one place a login's binding is held.
+
+| Field | Meaning |
+|---|---|
+| login name | the key |
+| server ID | the server the login is bound to; the server bound to a connection is this row's, which is what an entry's origin server and removeServer's self-refusal read |
+| state | `active`, `disabled` (refuses new connections), or `revoked` (terminal) |
+| created at | database clock |
+
 **Applied change**, one row per data-model change applied to the database: the change
 identifier (fixed by the release that shipped it, never reused; the key, with a uniqueness
 constraint), the engine version that shipped it, the oldest engine version that can use it,
@@ -176,15 +188,17 @@ administrator credential. Each engine version carries the identifiers of the cha
 requires.
 
 **Login operations**, database-side, each refusing unless its precondition, a fact of row
-state, holds; the layout operation or removal completion that calls one records the entry:
+state or of the calling connection, holds. createLogin, disableLogin and revokeLogin are
+reached only from inside a layout operation or removal's completion, which records the
+entry; resetSecret is reached directly, takes the actor and records `login.reset` itself:
 
 | Operation | Precondition the database checks | Does |
 |---|---|---|
-| createLogin | the server row named is `active` and no login is bound to it | creates a login bound to that server ID; returns its name and secret |
-| disableLogin | the server's status is `removing` | the login refuses new connections from commit |
-| revokeLogin | the login's server is `removing` or `removed` | ends the login's open connections and removes it; idempotent |
-| resetSecret | the connection was opened with the administrator credential | issues a new secret for that server's login |
-| listLogins | none | every login createLogin made, with the server ID it is bound to; no other login is listed or touched |
+| createLogin | the server row named is `active` and no Login row in state `active` or `disabled` is bound to it | creates a login and its Login row bound to that server ID; returns its name and secret |
+| disableLogin | the server's status is `removing` | the login refuses new connections from commit; the Login row reads `disabled` |
+| revokeLogin | the login's server is `removing` or `removed` | ends the login's open connections and removes it; the Login row reads `revoked`; idempotent |
+| resetSecret | the connection was opened with the administrator credential; the server's Login row is `active` | issues a new secret for that server's login |
+| listLogins | none | the Login rows; no other login is listed or touched |
 
 Check-then-act operations, each one transaction taking holds in the architecture's hold
 order:
@@ -196,10 +210,11 @@ order:
    against the other active servers' live leases as read under the mutex, so two acquisitions
    never admit each other unseen, and a refusal is Refused; succeed only if active and the
    lease is empty or expired; compare the record's transport, address, trust-anchor
-   fingerprint, login name and record version (from `recordFields`) with the stored values
-   (a stored empty record version is adopted, not compared), and if any differs write
+   fingerprint and record version (from `recordFields`) with the stored values (a stored
+   empty record version is adopted, not compared), and if any differs write
    `server.record.change` (actor: the local operator of this server; before and after; a
-   secret change is named, never valued) before overwriting them; if this is the first
+   record version moved with no other compared field changed is recorded as "secret
+   changed", never valued) before overwriting them; if this is the first
    acquisition of a process, write `server.start` (actor kind `engine`); read the lease timeout through configuration v1 `read` (the default
    if unset); read the own layout row; increase the generation; write expiry = now + timeout,
    the engine version and the informational fields; clear the occupant fields of every own
@@ -245,8 +260,8 @@ order:
    records the occupied nodes and does not refuse on them. createBoard creates the settings
    state row through configuration v1 `initWithin` and sets the minimum engine version to the
    setup tool's own version; createBoard and addServer create the server's login through
-   `createLogin`, store its name, and write the server's `http.connection_limit` through
-   configuration v1 `setWithin` (one `setting.change` entry).
+   `createLogin` and write the server's `http.connection_limit` through configuration v1
+   `setWithin` (one `setting.change` entry).
 6. **Drain** (a host stop, and any Fatal while a lease is held and the database is
    reachable): compare-and-set on the own server row matching own ID and own generation:
    expiry = now; then clear own node rows whose claim generation is the own generation;
@@ -291,9 +306,10 @@ checked inside the acquisition transaction (operation 1) at every acquisition (w
 such server, any version at or above the minimum is admitted). Data-model changes are
 applied only by applyChanges: the setup tool, under the administrator credential and, when a
 board exists, the cluster mutex, applies in one transaction every change its version ships
-that is not yet recorded as applied, records each, and never applies one twice; the change
-identifier's uniqueness constraint makes two concurrent first runs one Conflict, and a
-second upgrade behind the mutex finds nothing to apply. Each shipped change carries the
+that is not yet recorded as applied, records each, and never applies one twice; two
+concurrent first runs create the same entities, so one is Conflict (the architecture's
+transaction property), and a second upgrade behind the mutex finds nothing to apply. With no
+board row the minimum is not touched: createBoard sets it. Each shipped change carries the
 oldest engine version that can use it: the minimum becomes the greater of the current
 minimum and that version, and applyChanges is Refused, naming them, when an active server
 with a live lease is below it. Acquisition is Refused, naming the upgrade to run, when a change the engine's version
@@ -408,10 +424,11 @@ Serves: ADV-001
 | `layout.replan` | applyReplan that changes anything | every active range | every active range |
 | `server.stop` | the drain that follows a host stop or a Fatal | lease state | drained; the cause |
 | `server.start` | the first acquisition of a process (actor kind `engine`; a crash shows as a start with no `server.stop` before it) | empty | engine version |
-| `server.record.change` | acquisition finding the record's transport, address, trust-anchor fingerprint, login name or record version changed | those fields (a secret change named, never valued) | those fields |
+| `server.record.change` | acquisition finding the record's transport, address, trust-anchor fingerprint or record version changed | those fields (a secret change named, never valued) | those fields |
+| `login.reset` | resetSecret (actor kind `first-run-operator`) | login name | secret reset; no value |
 | `board.recover` | createBoard returning an existing first server | server ID | new secret issued |
 | `login.revoke` | removal's completion revoking a removed server's login (actor kind `engine`) | login name | revoked |
-| `board.upgrade` | applyChanges when a board exists and applies at least one change | minimum engine version, highest applied change | the same, after |
+| `board.upgrade` | applyChanges when a board exists and applies at least one change | minimum engine version, the latest applied change by order | the same, after |
 
 The HTTP connection limit is a setting and its changes are audited by configuration as
 `setting.change`. Refused operations change nothing and write no entry.
@@ -444,7 +461,7 @@ Serves: ADV-001
 | health | an anonymous mapper | learn fullness and timing | detail only on the management listener from a peer inside the trusted proxy list; the public listener says up or down; only the peer address is consulted; no database read | empty or unparseable list means minimal |
 | who's-online | an anonymous caller | count per-server fullness | gated on `whos_online.view` | Denied on any error |
 | registry | a caller without the permission | change the board | every state-changing operation gated through access-control v1 | error means Denied |
-| first run | anyone who can run the setup tool against an empty database | create a board and its first login | `board.create` for the first-run operator (whoever the database accepted with the administrator credential); the administrator credential is supplied once and never stored or logged; a board whose first server has acquired a lease cannot be created again; the change identifier's uniqueness constraint makes two concurrent first runs one Conflict | Refused or Conflict |
+| first run | anyone who can run the setup tool against an empty database | create a board and its first login | `board.create` for the first-run operator (whoever the database accepted with the administrator credential); the administrator credential is supplied once and never stored or logged; a board whose first server has acquired a lease cannot be created again; two concurrent first runs create the same entities, so one is Conflict | Refused or Conflict |
 | removal | whoever holds a removed server's disk | act as a server, or open sealed values with the key-encryption key still on that disk | removal disables every login recorded for the server in the transaction and revokes them after; a login is created only for an active server that holds none, and a live server's login cannot be disabled, revoked or reset by any server login outside a removal; the key on the disk is an accepted residual risk | disabling failure refuses the removal; a pending revocation is retried by every server |
 | a lying server | a program holding server A's login | renew server B's lease, claim B's nodes, write B's rows or the board's, or run a registry operation as if it were a sysop: remove B, or add a server and receive its login | direct writes are bound to A's ID and A's nodes, and the database refuses the rest; the registry operations are database-side, check their own preconditions and record A as the origin server, so a removal or an added server A runs is on the record against A; that A can run one at all is the trust the brief grants a server login ("they are a server, with everything a server can do") | the database rejects the direct write; the operation's preconditions hold; the entry names A |
 | the data model | a program holding any server login | change an entity, a constraint, a role, an operation, or an applied-change row | only the administrator credential can; applyChanges is the one path and records what it did | the database rejects it |
@@ -483,13 +500,13 @@ architecture's negative tests describe.
 23. Engine below the minimum → Refused naming the required version.
 24. Engine two steps above the lowest other active server, or two steps below the highest → Refused naming the window; one step either way → admitted.
 25. A data-model change shipped by version N+1 whose oldest usable version is N, applied by applyChanges with the lowest active server on N → the minimum becomes N; servers on N keep serving; a server that then starts on N−1 is refused naming N; the change is recorded once and a second applyChanges applies nothing and writes no entry. The same change with oldest usable version N+1 and a live server on N → Refused naming that server; nothing applied. An engine on N+1 acquiring before the upgrade is applied → Refused naming the upgrade; applyChanges from a setup tool below the board's minimum → Refused.
-25a. Under a server login through the harness, an attempt to alter the constraint binding logins to servers, the audit entity's grants, or an applied-change row → rejected by the database.
+25a. Under a server login through the harness, an attempt to alter the Login entity's grants or constraints, the audit entity's grants, or an applied-change row → rejected by the database.
 26. A lone server on N restarts as N+2 → admitted (no other active server); two lone servers on N and N+2 acquiring at once → one admitted, the other Refused; a Fenced server on N re-acquiring after the others moved to N+2 → Refused.
 27. A second process with the same identity while the first renews → Refused as already running; the first's lease and sessions untouched.
 28. Drain from a stale process while a successor holds the lease → zero rows; the successor's lease and occupied nodes untouched.
 29. Remove a server → its sessions end within one renewal interval and it reaches Refused ("removed"); its node rows are gone and its server row reads `removed` once the second step has run; its login is disabled in the transaction; another server's next renewal runs the second step, after which an already-open connection of that login fails its next statement and a new login attempt is rejected; a later add never receives its ID.
 30. Remove with disabling the login forced to fail → Refused; the server still active. Remove with the second step's revocation forced to fail → status `removing`; another server's renewal completes it once the fault is lifted.
-30a. Under server A's login through the harness: a login row inserted directly, `createLogin` naming active server B (which already holds a login), `disableLogin` for active B, `revokeLogin` for active B, and `resetSecret` for B → each rejected by the database, and B keeps serving through its next renewal; removeServer(B) called directly under A's login → succeeds, and `server.remove` names A as origin server. After renewals on every server, the administrator credential still authenticates and `listLogins` reports only the logins createLogin made.
+30a. Under server A's login through the harness: a Login row inserted, changed or deleted directly, `createLogin` naming A itself or active server B (each already bound to an active Login row), `disableLogin` for active B, `revokeLogin` for active B, and `resetSecret` for B → each rejected by the database, and B keeps serving through its next renewal; removeServer(B) called directly under A's login → succeeds, and `server.remove` names A as origin server. After renewals on every server, the administrator credential still authenticates and `listLogins` reports only the logins createLogin made.
 30b. A direct `setWithin` and a direct `setNodeCount` under server A's login, past the tools → each leaves exactly one audit entry naming the actor given and A as origin server.
 31. Remove the last active server → Refused. Remove the server whose login carries the operation → Refused.
 32. Remove an already removed server → Refused; one audit entry only.
@@ -507,8 +524,8 @@ architecture's negative tests describe.
 44. A clock gap longer than the timeout (injected) → the lease treated as lost at the next checkpoint.
 45. Release twice for one session → both succeed; the node is free once.
 46. A host stop → the server drains, `server.stop` is audited with cause `host stop` and actor kind `engine`, and the process exits with the no-restart code; a host stop with the database unreachable → the drain writes nothing, the process exits at the local deadline; a process start → `server.start` at its first acquisition with actor kind `engine`; the process killed through the harness, then restarted → `server.start` with no `server.stop` before it, and no entry naming the local operator.
-47. createBoard when a board exists whose first server has acquired a lease → Refused; when its first server never acquired and the same key identifier, address and transport are presented → the same server ID and a new secret, `board.recover` audited; with a different key identifier → Refused; two concurrent first runs against an empty database → one succeeds, one Conflict.
-48. The setup tool changes the record's trust anchor, or resets only the secret, then the engine restarts → `server.record.change` is written at acquisition (the fingerprint before and after, or "secret changed" with no value); with audit forced to fail, the acquisition fails; a first acquisition after createBoard or addServer with an unchanged record writes `server.start` and no `server.record.change`; the same record changed before the second acquisition → `server.record.change`.
+47. createBoard when a board exists whose first server has acquired a lease → Refused; when its first server never acquired and the same key identifier, address and transport are presented → the same server ID and a new secret, `board.recover` audited; with a different key identifier → Refused; two concurrent first runs against an empty database → one succeeds, the other Conflict at applyChanges or Refused ("a board exists") at createBoard, and one board exists.
+48. The setup tool changes the record's trust anchor, or resets only the secret, then the engine restarts → `server.record.change` is written at acquisition (the fingerprint before and after, or "secret changed" with no value; the reset also left one `login.reset` entry before the restart); with audit forced to fail, the acquisition fails; a first acquisition after createBoard or addServer with an unchanged record writes `server.start` and no `server.record.change`; the same record changed before the second acquisition → `server.record.change`.
 48a. A record whose key identifier is not the board's → acquisition Refused ("wrong board key").
 49. Conflict from contention on renewal (injected) → retried within the interval; no session ends.
 50. Two servers named "Alpha" and "alpha" → the second addServer is Conflict.

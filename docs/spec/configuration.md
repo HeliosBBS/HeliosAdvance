@@ -24,8 +24,8 @@ Provided, **configuration v1**:
 | set | actor, key, target server (for a server-scoped key), value | the value stored | Denied, Invalid, NotFound, Conflict, Unavailable |
 | restartNeeded | server | the restart-mode keys, board-scoped or scoped to that server, changed since that server's process loaded its first snapshot | Unavailable |
 | refresh | the settings version reported by the last lease renewal | none | Unavailable |
-| read | inside a caller's transaction: key, target server | the stored value, or the default when none is stored | NotFound |
-| setWithin | inside a caller's transaction that already holds the settings state row: actor, key, target server, value | the value stored; records its own entry | Invalid, NotFound |
+| read | inside a caller's transaction: key, target server | the stored value; the default when none is stored, or when the stored value fails the declared validation | NotFound |
+| setWithin | inside a caller's transaction: actor, key, target server, value | the value stored; takes the settings state hold if the caller has not; records its own entry | whatever the transaction reports |
 | initWithin | inside createBoard's transaction | the settings state row, created | Conflict (exists) |
 | list | actor, target server | every declared key with its kind, scope, apply mode, default and the stored value for that target (a secret value withheld; a stored value failing validation flagged as invalid) | Denied, Unavailable |
 
@@ -33,7 +33,10 @@ Gate for `set` and `list`, through access-control v1: `board.administer`; or
 `server.connectivity` for the target server when the key is a connectivity setting (`list`
 then shows only that server's connectivity settings). Any error from the check is Denied.
 `read` and `setWithin` run inside another subsystem's transaction and are gated by that
-subsystem's operation. The engine calls cluster.registry v1 `markStarted` once after its
+subsystem's operation. `set` is the process-side step (the gate, validation against the
+declaration, NotFound for an undeclared key) that calls the database-side write; the write
+itself raises no Invalid or NotFound, and a caller of `setWithin` checks the rule for the
+key it writes (the layout operations check the HTTP limit's bounds inside themselves). The engine calls cluster.registry v1 `markStarted` once after its
 first snapshot load.
 
 Consumed: access-control v1; audit v1 (every `set` and `setWithin` records
@@ -109,7 +112,7 @@ inside cluster's renewal.
 Serves: ADV-001
 | Action | When | Before | After |
 |---|---|---|---|
-| `setting.change` | every `set` | the value replaced ("changed" for a secret) | the value stored ("changed" for a secret), the key, the scope server |
+| `setting.change` | every `set` and `setWithin` | the value replaced ("changed" for a secret) | the value stored ("changed" for a secret), the key, the scope server |
 
 ## Configuration
 Serves: ADV-001
@@ -145,8 +148,9 @@ Serves: ADV-001
 - A direct write of a setting row or the settings state row under a server login, outside
   `set` → rejected by the database; the stored value unchanged.
 - `cluster.lease_timeout_renewals` stored as 0 by a direct `set` under a server login → its
-  entry exists; every server's `get` returns the default and no lease shortens; `list` shows
-  the stored value as invalid; a later valid `set` replaces it.
+  entry exists; every server's `get` returns the default and no lease shortens; an
+  acquisition after the store writes expiry = now + the default; `list` shows the stored
+  value as invalid; a later valid `set` replaces it.
 
 ## Revision history
 - 2026-09-23: created for ADV-001.
