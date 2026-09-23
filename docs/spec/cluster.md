@@ -1,5 +1,5 @@
 # Cluster
-Serves: ADV-001
+Serves: ADV-001, ADV-002
 
 ## Purpose
 Serves: ADV-001
@@ -17,7 +17,7 @@ list, management listener, public listener, node handle, caller reference, appli
 data-model change, database-side operation, administrator credential.
 
 ## Contracts
-Serves: ADV-001
+Serves: ADV-001, ADV-002
 Provided:
 
 **cluster.nodes v1**, to the caller surfaces (Telnet, SSH, web):
@@ -52,7 +52,8 @@ on every call. Gate: `whos_online.view` through access-control v1. Errors: Denie
 Unavailable (the menu shows "who's online is not available"). The viewer is an input of the
 contract.
 
-**cluster.registry v1**, to the setup tool, the runtime configuration tools and join v1. Each
+**cluster.registry v1**, to the setup tool, the runtime configuration tools (through admin-api
+v1), admin-api and join v1. Each
 operation is gated through access-control v1 as its row says; each state-changing operation
 records its audit entry through audit v1; markStarted is not an operator action and records
 none. The database-side operations behave as the architecture's login tiers state: a server
@@ -74,6 +75,7 @@ limit bounds) inside the database, and their Invalid comes from there.
 | applyReplan | `board.administer` | actor, expected layout version | ranges | Denied, Conflict, Refused (nodes in use), Unavailable |
 | removeServer | `board.administer` | actor, server, the server ID typed again | none | Denied, Invalid (mismatch), NotFound, Refused (already removed; the last active server; the server whose login carries this operation), Unavailable |
 | markStarted | none: not an operator action; the engine calls it once per process | the settings version of the first snapshot | none | Unavailable |
+| leaseOf | none: not an operator action; admin-api calls it before relaying an action | server | whether its lease is live on the database clock, and its lease generation | NotFound, Unavailable |
 | completeRemoval | none: not an operator action; the engine calls it after a renewal reads back a server in `removing` | actor (kind `engine`, reference the calling process's own server ID), server | none; a second run finds `removed` and writes nothing | NotFound, Refused (the server is `active`), Unavailable |
 
 createBoard recovers a first run whose record write failed: when a board exists whose first
@@ -116,7 +118,7 @@ When a theme screen fails, a fixed built-in line ("All nodes are busy. Please ca
 later." or "This server is not accepting callers.") is shown and the connection still ends.
 
 ## Data model
-Serves: ADV-001
+Serves: ADV-001, ADV-002
 **Board**, exactly one row, enforced by a uniqueness constraint on a fixed key; its exclusive
 hold is the cluster mutex.
 
@@ -202,7 +204,7 @@ recovery issues its secret through the same internal step without resetSecret, s
 | createLogin | the server row named is `active` and no Login row in state `active` or `disabled` is bound to it | creates a login and its Login row bound to that server ID; returns its name and secret |
 | disableLogin | the server's status is `removing` | the login refuses new connections from commit; the Login row reads `disabled` |
 | revokeLogin | the login's server is `removing` or `removed` | ends the login's open connections and removes it; the Login row reads `revoked`; idempotent |
-| resetSecret | the connection was opened with the administrator credential; the server's Login row is `active` | issues a new secret for that server's login |
+| resetSecret | the connection was opened with the administrator credential; the server's Login row is `active` | issues a new secret for that server's login, and calls sessions.operator v1 `revokeForServer` for that server (cause `server secret reset`) in the same transaction |
 | listLogins | none | the Login rows; no other login is listed or touched |
 
 Check-then-act operations, each one transaction taking holds in the architecture's hold
@@ -270,7 +272,9 @@ order:
    state row through configuration v1 `initWithin` and sets the minimum engine version to the
    setup tool's own version; createBoard and addServer create the server's login through
    `createLogin` and write the server's `http.connection_limit` through configuration v1
-   `setWithin` (one `setting.change` entry).
+   `setWithin` (one `setting.change` entry). removeServer, last, calls sessions.operator v1
+   `revokeForServer` for the server removed, so every credential issued under its login ends in
+   the same transaction.
 6. **Drain** (a host stop, and any Fatal while a lease is held and the database is
    reachable): compare-and-set on the own server row matching own ID and own generation:
    expiry = now; then clear own node rows whose claim generation is the own generation;
@@ -444,12 +448,12 @@ The HTTP connection limit is a setting and its changes are audited by configurat
 `setting.change`. Refused operations change nothing and write no entry.
 
 ## Configuration
-Serves: ADV-001
+Serves: ADV-001, ADV-002
 | Key | Default | Kind | Scope | Apply | Exposed by |
 |---|---|---|---|---|---|
 | `cluster.node_count` (a Layout field, not a registry key; changed only by setNodeCount) | 4 | sysop tunable; 0 up to the node-number backstop | server | live | runtime configuration tools; setup tool at first run and join |
-| `cluster.lease_timeout_renewals` | 3 | sysop tunable; 2 to 10 (fixed backstops: below 2 one late write drops a healthy server, above 10 a dead server's callers stay listed too long); applied at the next renewal | board | live | runtime configuration tools |
-| `cluster.trusted_proxies` | empty | sysop tunable; a list of address ranges in prefix notation (RFC 4632 for IPv4, RFC 4291 for IPv6), no names; an IPv4 peer arriving as an IPv4-mapped IPv6 address (RFC 4291 section 2.5.5.2) is compared as IPv4 | board | live | runtime configuration tools |
+| `cluster.lease_timeout_renewals` | 3 | sysop tunable; 2 to 10 (fixed backstops: below 2 one late write drops a healthy server, above 10 a dead server's callers stay listed too long); applied at the next renewal; settings group `cluster` | board | live | runtime configuration tools |
+| `cluster.trusted_proxies` | empty | sysop tunable; a list of address ranges in prefix notation (RFC 4632 for IPv4, RFC 4291 for IPv6), no names; an IPv4 peer arriving as an IPv4-mapped IPv6 address (RFC 4291 section 2.5.5.2) is compared as IPv4; also the peers whose PROXY protocol headers admin-api believes, and requires; settings group `remote administration`; a range added or widened is a loosening, whose finding names the range | board | live | runtime configuration tools |
 | lease renewal interval | five seconds | calibration target | fixed | n/a | not exposed |
 | node-number backstop | 2,147,483,647 | fixed policy backstop | fixed | n/a | not exposed |
 | draining bound | one lease timeout | fixed policy backstop | fixed | n/a | not exposed |
@@ -460,7 +464,8 @@ Tool screens: Servers (listServers, restart-needed flags); Server detail (count 
 resulting range or refusal, HTTP limit, transport and address as stored, remove with typed
 confirmation); Layout (previewReplan; apply disabled while any affected node is occupied,
 listing them); Board (lease timeout in renewals with the resulting seconds, trusted proxy
-list). The setup tool's offering is access-control's.
+list). The setup tool's offering is access-control's. This document declares the settings group
+`cluster`, which an automation token may change; admin-api declares `remote administration`.
 
 ## Security considerations
 Serves: ADV-001
@@ -479,7 +484,7 @@ Serves: ADV-001
 | a re-plan or count change | a slow layout operation | stall every server's renewal | layout operations hold layout and node rows, and only the server row of a server being created or removed | renewal never waits on layout |
 
 ## Negative tests
-Serves: ADV-001
+Serves: ADV-001, ADV-002
 The gate tests cover each state-changing registry operation by name (applyChanges,
 resetSecret, createBoard, addServer, setNodeCount, applyReplan, removeServer) and the reads (listServers, previewReplan) and
 whosOnline.list. Database failures and clock movement are injected through the harness the
@@ -533,6 +538,10 @@ architecture's negative tests describe.
 42. `cluster.lease_timeout_renewals` set to 1 or 11 → Invalid.
 43. `cluster.trusted_proxies` with a name or an unparseable entry → Invalid; stored list unchanged.
 44. A clock gap longer than the timeout (injected) → the lease treated as lost at the next checkpoint.
+44a. removeServer(B) with credentials issued under B's login and under A's → every credential
+   issued under B's ended with cause `server removed` in the same transaction, each with its
+   `credential.revoke` entry; A's still active. resetSecret(B) → the same, with cause `server
+   secret reset`.
 45. Release twice for one session → both succeed; the node is free once.
 46. A host stop → the server drains, `server.stop` is audited with cause `host stop` and actor kind `engine`, and the process exits with the no-restart code; a host stop with the database unreachable → the drain writes nothing, the process exits at the local deadline; a process start → `server.start` at its first acquisition with actor kind `engine`; the process killed through the harness, then restarted → `server.start` with no `server.stop` before it, and no entry naming the local operator.
 47. createBoard when a board exists whose first server has acquired a lease → Refused; when its first server never acquired and the same key identifier, address and transport are presented → the same server ID and a new secret, `board.recover` audited as the only entry, with actor kind `first-run-operator`, an empty actor reference and no origin server; with a different key identifier → Refused; two concurrent first runs against an empty database → one succeeds, the other Conflict at applyChanges or at createBoard, or Refused ("a board exists") at createBoard, and one board exists.
@@ -547,4 +556,6 @@ architecture's negative tests describe.
 
 ## Revision history
 - 2026-09-23: created for ADV-001.
+- 2026-09-23: leaseOf, removal revoking the removed server's credentials, settings groups, and
+  the trusted proxy list's part in the Admin API for ADV-002.
 - 2026-09-23: the normalised name folds under the database's Unicode version, not a fixed one.

@@ -1,5 +1,5 @@
 # Architecture
-Serves: ADV-001
+Serves: ADV-001, ADV-002
 
 ## Purpose
 Serves: ADV-001
@@ -10,15 +10,17 @@ order in which entities are held, and the order in which a server starts. Every 
 is stated once, in the subsystem that owns it; this document owns only what is shared.
 
 ## Terms
-Serves: ADV-001
+Serves: ADV-001, ADV-002
 As the estate glossary defines them: board, server, node, caller, session, surface, database,
 lease, sysop, local operator, setup tool, runtime configuration tools, bootstrap record,
 key-encryption key, layout, re-plan, occupancy, screen boundary, reconcile, trusted proxy
 list, public listener, management listener, actor, database-side operation, administrator
-credential.
+credential, Admin API, allow list, host connection, local endpoint, source address, operator
+account, credential, settings group, loosening finding, confirmation, relayed action, board
+signing key, board identifier; access-control defines the credential ceiling.
 
 ## Contracts
-Serves: ADV-001
+Serves: ADV-001, ADV-002
 Provided: none at this level; every contract is provided by a subsystem and listed in its
 document. Consumed contracts that no subsystem in this corpus provides are published in the
 estate's contracts register by name and version and cited that way.
@@ -32,18 +34,19 @@ The subsystems, each with its own document:
 | cluster | the board, servers, leases, the layout, node occupancy, who's-online, server health, version admission, removal, board creation |
 | configuration | the settings registry: keys, kinds, scopes, defaults, values, versions, restart-needed reporting |
 | audit | the audit entry and the one way to write and read it |
-| http | each server's public and management listeners, their connection limits and deadlines, and the routes other subsystems mount |
+| http | each server's public, management and admin listeners and its local endpoint, their connection limits and deadlines, and the routes other subsystems mount |
+| sessions | the engine's one home for session handling: the record of operator credentials, their console devices and sign-in attempts, issuing, verifying, expiring and revoking them; the caller sessions of sessions v1 belong here when their feature publishes them |
+| admin-api | the Admin API every administration tool reaches the board through: the allow list, connection admission, sign-in, the per-request pipeline, the remote exposure, the relay of an action to another server |
 
 Programs, each a separate process: the engine; the setup tool, run by the local operator on
-the server's host; the runtime configuration tools (command-line and graphical), run on a
-server's host, acting as the sysop who logs into them through accounts v1. Which account each
-runs as, per protection tier, is database-access's table. Every program reaches the database
-only through database-access v1; no other subsystem holds a connection. The graphical runtime
-configuration tool shares no code with the other programs and carries a second
-implementation of two mechanisms, each described by its owner: the database-access v1
-operations it uses (database-access) and the access-control v1 check (access-control). A
-second implementation follows the owning document unchanged, and that document's negative
-tests run against every implementation, so two implementations cannot drift apart unnoticed.
+the server's host; and the administration tools (the runtime configuration tools, the console
+and the tools later features add, each command-line or text-mode, and graphical), run on any
+computer, which reach the board only through admin-api v1 on any server, acting as the
+operator account signed in to them. Which account the engine and the setup tool run as, per
+protection tier, is database-access's table. The engine and the setup tool reach the database
+only through database-access v1, and no other subsystem holds a connection; an administration
+tool holds no database login and makes no permission decision of its own, so every mechanism
+the constitution requires once has exactly one implementation, in the engine.
 
 Error classes, used by every contract and owned here:
 
@@ -69,7 +72,7 @@ renewal; a settings write that loses the race to create a row retries once. A re
 operator action is a new action and writes a new audit entry.
 
 ## Data model
-Serves: ADV-001
+Serves: ADV-001, ADV-002
 The database is the board's single source of truth. Properties every subsystem may rely on,
 realised by the stack:
 
@@ -89,10 +92,10 @@ realised by the stack:
 - **The database clock** is the one time source for every stored timestamp and every
   comparison of times across servers.
 - **An increasing identifier**, as the glossary defines it.
-- **A login** is what a program authenticates to the database with. Every program on a
-  server's host authenticates with that server's login, except the setup tool, which uses the
+- **A login** is what a program authenticates to the database with. The engine and the setup
+  tool authenticate with their server's login, except that the setup tool uses the
   administrator credential through database-access's `openWith` at first run, at an upgrade
-  and for a secret reset. Rights come in three tiers, and the database enforces every one:
+  and for a secret reset; an administration tool holds no login. Rights come in three tiers, and the database enforces every one:
   - **A server login** is bound to one server ID. It reads everything a server needs. It
     writes directly only these fields of its own server row: lease generation, lease expires
     at, lease timeout used, engine version, operating system and processor architecture,
@@ -102,7 +105,8 @@ realised by the stack:
     database-side operations. The database refuses every other write from it: any other
     field of its own row, another server's row, a node row it does not own, any node row's
     owner or number, an inserted server or node row, the board row, a layout row, a setting
-    row, the settings state, an applied-change row, a login row.
+    row, the settings state, an applied-change row, a login row, a credential, console device or
+sign-in attempt row, a relayed action row, the remote-administration policy row.
   - **A database-side operation** runs inside the database with the data model owner's
     rights. Every one that an operator action reaches directly takes the actor as an input,
     checks its preconditions against row state or the calling connection, and records its
@@ -114,7 +118,9 @@ realised by the stack:
     and what it did is on the record. They are the layout operations (createBoard, addServer,
     setNodeCount, applyReplan, removeServer), completeRemoval, the settings writes
     (`writeSetting`, which configuration's `set` and `setWithin` reach, and `initWithin`),
-    cluster's login operations, and applyChanges,
+    cluster's login operations, sessions' credential operations (`endExpired`, `touch`, issue,
+    end, revoke, `revokeForAccount`, `revokeForServer`, the attempt operations and the sweep),
+    admin-api's relay and policy operations, and applyChanges,
     createBoard and resetSecret, which run only under the administrator credential, a
     precondition the database checks and not only the gate. Any server login may
     call the others, except createLogin, disableLogin and revokeLogin, which the database
@@ -134,12 +140,18 @@ realised by the stack:
   and may be lost; nothing in this corpus depends on receiving one.
 
 Hold order, global, so that no two transactions wait on each other: board, then settings
-state, then server rows in ascending ID, then layout rows in ascending server ID, then
-setting rows in key order, then node rows in ascending number, then login rows in login-name order. A transaction
-takes holds in that order and never goes back.
+state, then the remote-administration policy, then server rows in ascending ID, then layout
+rows in ascending server ID, then setting rows in key order, then node rows in ascending
+number, then login rows in login-name order, then the rows accounts v1, rbac v1 and
+second-factor v1 own (in the order their providing feature states), then relayed action rows,
+then sign-in attempt rows, then console device rows, then credential rows, each of the last
+four in ascending ID. A transaction takes holds in that order and never goes back. Credential
+rows are last so that any owner's transaction can revoke an account's or a server's
+credentials inside itself. A relayed action's claim and its finish are transactions of their
+own, so the handler between them takes its holds afresh.
 
-Identity sources: server IDs, audit entry IDs and the applied-change order are increasing
-identifiers; a change identifier is fixed by the release that ships it. Node numbers and layout positions are assigned by cluster's layout operations
+Identity sources: server IDs, audit entry IDs, credential, console device, sign-in attempt
+and relayed action IDs, and the applied-change order are increasing identifiers; a change identifier is fixed by the release that ships it. Node numbers and layout positions are assigned by cluster's layout operations
 under the cluster mutex. Session identifiers come from one source, sessions v1, and are
 unpredictable and unique across servers.
 
@@ -148,11 +160,14 @@ local lease deadline; it counts elapsed real time including any period the host 
 suspended, and never goes backwards.
 
 ## Behaviour
-Serves: ADV-001
+Serves: ADV-001, ADV-002
 Start-up order on every server: database-access opens the connection; configuration builds
 the registry; cluster checks the version and the applied changes, admits the server and holds
 its lease; configuration
-loads the snapshot; http opens the listeners; only then does any surface accept a caller.
+loads the snapshot; admin-api reads the allow list and resolves its hostnames, and reads its
+certificate chain; http opens the listeners, the admin listener only when a chain exists; the
+sessions sweep, the relay sweep and the hostname refresh start; only then does any surface
+accept a caller.
 The process states are cluster's.
 
 ## Failure directions
@@ -181,26 +196,26 @@ None at this level; each subsystem declares its own keys in the configuration re
 lists them in its document.
 
 ## Security considerations
-Serves: ADV-001
+Serves: ADV-001, ADV-002
 | Surface | Attacker | Abuse | Decision | Fails closed |
 |---|---|---|---|---|
 | a caller at a surface | anyone on the network | act beyond a caller's standing | untrusted until a session vouches; every gate calls access-control | Denied |
 | a server at the database | anyone holding a server login | act as a server, or beyond one | a login is trusted as a server; the wire is protected by database-access; what it writes directly, what only a database-side operation may do, and what only the administrator credential may do are the login tiers above | no verified transport, no connection; a write outside the tier is rejected |
 | the local operator | whoever holds a bootstrap record | act on the board | they hold a server login and are trusted as a server; the setup tool offers them only their server's connectivity, which is convenience and audit, not a boundary | n/a |
-| a sysop | an account holding the sysop permission | change the board | trusted as their permissions allow; every action audited | Denied on any check failure |
-| the graphical tool at the database | whoever runs it, and anyone on the network path | reach the database over a weaker wire, or past a weaker check, than the engine's | its database-access and its gate implement the owning documents unchanged and pass the same negative tests | as database-access and access-control: no verified transport, no connection; any check failure is Denied |
+| an operator account | an account signed in through admin-api | change the board | trusted as its permissions and its credential's ceiling allow; every action audited with the credential and source | Denied on any check failure |
+| an administration tool | whoever runs it, and anyone on the network path | reach the database, or act past a check | a tool holds no database login and decides nothing; admin-api admits, authenticates and authorises every request in the engine | no admission, no request; any check failure refuses it |
 
 ## Negative tests
-Serves: ADV-001
+Serves: ADV-001, ADV-002
 Tests inject database failures (a refused connection, a delayed or dropped write, an aborted
 transaction, a rejected login) and clock movement through a controllable connection and clock
 that the stack provides, and can open a connection under any server's login or under the
 administrator credential, so every
-negative test in the subsystem documents can force its dependency to fail. The database-access
-and access-control negative tests run against each implementation of those contracts, the
-graphical runtime configuration tool's included. None at this level.
+negative test in the subsystem documents can force its dependency to fail. None at this level.
 
 ## Revision history
 - 2026-09-23: created for ADV-001.
 - 2026-09-23: the graphical runtime configuration tool carries its own database-access and
   access-control implementation, held equal by the shared negative tests.
+- 2026-09-23: the administration tools reach the board only through the Admin API; the
+  graphical tool's second implementations removed; sessions and admin-api added.

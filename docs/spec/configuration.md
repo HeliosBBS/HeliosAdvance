@@ -1,5 +1,5 @@
 # Configuration
-Serves: ADV-001
+Serves: ADV-001, ADV-002
 
 ## Purpose
 Serves: ADV-001
@@ -10,29 +10,51 @@ from one registry rather than knowing each key. It is not the owner of any setti
 meaning: each subsystem declares its keys and reads its own values.
 
 ## Terms
-Serves: ADV-001
-As the glossary defines them: registry, scope, apply mode, snapshot, connectivity setting.
+Serves: ADV-001, ADV-002
+As the glossary defines them: registry, scope, apply mode, snapshot, connectivity setting,
+settings group, loosening finding, confirmation. This document introduces:
+
+- **revision**: a stored value's `changed at version`; 0 for an absent row.
+- **owner-set**: a key only its owning subsystem's operation writes, through `setWithin`.
+- **the confirmation rule**: how every loosening is confirmed, stated once under Contracts.
 
 ## Contracts
-Serves: ADV-001
+Serves: ADV-001, ADV-002
 Provided, **configuration v1**:
 
 | Operation | Inputs | Outputs | Errors |
 |---|---|---|---|
-| declare | at start-up only: key, kind, scope (`board` or `server`), default, validation rule, apply mode (`live` or `restart`), secret (yes or no), connectivity setting (yes or no; allowed only with scope `server`) | none | Invalid (duplicate key, or a board-scoped connectivity setting: a start-up defect; the process stops with Fatal) |
+| declareGroup | at start-up only: group name, whether it is closed to automation tokens | none | Invalid (duplicate group: a start-up defect; Fatal) |
+| declare | at start-up only: key, kind, scope (`board` or `server`), default, validation rule, apply mode (`live` or `restart`), secret (yes or no), connectivity setting (yes or no; allowed only with scope `server`), settings group, loosening rule (none, or a rule from the before and after values to a list of loosening findings), owner-set (yes when only its owning subsystem's operation may write it, through `setWithin`) | none | Invalid (duplicate key, an undeclared group, or a board-scoped connectivity setting: a start-up defect; the process stops with Fatal) |
+| groupClosed | a group name | whether it is closed to automation tokens | NotFound |
 | get | key; for a server-scoped key this server is implied | the value from the snapshot; the default when none is stored, or when the stored value fails the declared validation | none |
-| set | actor, key, target server (for a server-scoped key), value | the value stored | Denied, Invalid, NotFound, Conflict, Unavailable |
+| preview | actor, key, target server, value | the loosening findings the change would have, and their confirmation | Denied, Invalid, NotFound, Unavailable |
+| set | actor, key, target server (for a server-scoped key), value, expected revision (optional), confirmation (optional) | the value stored and its revision | Denied, Invalid (an owner-set key), NotFound, Conflict (the expected revision moved), Refused (confirmation required, with the findings), Unavailable |
+| lockWithin | inside a caller's transaction: nothing | the settings state held exclusively, for an owner that then takes later holds before `setWithin` | whatever the transaction reports |
 | restartNeeded | server | the restart-mode keys, board-scoped or scoped to that server, changed since that server's process loaded its first snapshot | Unavailable |
 | refresh | the settings version reported by the last lease renewal | none | Unavailable |
 | read | inside a caller's transaction: key, target server | the stored value; the default when none is stored, or when the stored value fails the declared validation | NotFound |
-| setWithin | inside a caller's transaction: actor, key, target server, value | the value stored; takes the settings state hold if the caller has not; records its own entry | whatever the transaction reports |
+| setWithin | inside a caller's transaction: actor, key, target server, value, confirmed findings (optional) | the value stored; takes the settings state hold if the caller has not; records its own entry | whatever the transaction reports |
 | initWithin | inside createBoard's transaction | the settings state row, created | Conflict (exists) |
-| writeSetting | the database-side write that `set` and `setWithin` reach: actor, key, target server, value | the value stored | Conflict, Unavailable |
-| list | actor, target server | every declared key with its kind, scope, apply mode, default and the stored value for that target (a secret value withheld; a stored value failing validation flagged as invalid) | Denied, Unavailable |
+| writeSetting | the database-side write that `set` and `setWithin` reach: actor, key, target server, value, confirmed findings (optional) | the value stored | Conflict, Unavailable |
+| list | actor, target server, a settings group or none | every declared key the actor may read with its kind, scope, apply mode, default, group, whether it has a loosening rule, the stored value for that target and its revision (a secret value withheld; a stored value failing validation flagged as invalid) | Denied, Unavailable |
 
-Gate for `set` and `list`, through access-control v1: `board.administer`; or
-`server.connectivity` for the target server when the key is a connectivity setting (`list`
-then shows only that server's connectivity settings). Any error from the check is Denied.
+Gate for `set` and `preview`, through access-control v1: `settings.change` with the key's
+settings group as the target, or, when the key is a connectivity setting, `server.connectivity`
+for the target server; either suffices. Gate for `list`: `settings.read` for each key's group, a key whose group
+is refused being left out; or `server.connectivity` for the target server, `list` then showing
+only that server's connectivity settings. Any error from a check is Denied.
+
+The **confirmation rule**, stated here once and used by every owner of a loosening: the
+findings are computed by the engine, never taken from the client; the confirmation of a change
+is the SHA-256 (FIPS 180-4) of the JSON canonical form (RFC 8785) of the object holding the
+operation name, the key or subject, the target, the requested value and the findings sorted by
+code then subject; the change is made when it has no findings, or when the confirmation given
+equals the one recomputed from the findings found inside the change's own transaction after its
+holds are taken; otherwise it is Refused (confirmation required) with the findings, and nothing
+is written. The confirmed findings are recorded in the change's audit entry. `set` computes the
+findings for a key with a loosening rule after taking the settings state hold, so no change
+between its reads and its write goes unjudged.
 `read` and `setWithin` run inside another subsystem's transaction and are gated by that
 subsystem's operation. `set` is the process-side step (the gate, validation against the
 declaration, NotFound for an undeclared key) that calls `writeSetting`, the database-side write, which
@@ -79,7 +101,7 @@ The server's started settings version is a field of cluster's Server entity; `re
 compares against it.
 
 ## Behaviour
-Serves: ADV-001
+Serves: ADV-001, ADV-002
 | State | Input | Transition |
 |---|---|---|
 | Snapshot at version v | a lease renewal reports version w > v | reload the whole snapshot; snapshot at w |
@@ -93,6 +115,10 @@ Serves: ADV-001
 | any | `set` passing its deadline | Unavailable; the write's outcome is unknown; the tool shows the stored value on its next read |
 | any | `set` concurrently from two sessions or two servers | serialised by the holds above; both entries written |
 | any | the connection lost during `set` | Unavailable; the outcome is unknown until the next read |
+| any | `set` of a key with a loosening rule, findings, no confirmation or one that does not match | Refused (confirmation required) with the findings; nothing written |
+| any | `set` of a key with a loosening rule, findings, the matching confirmation | written; the entry records the confirmed findings |
+| any | `set` with an expected revision that is no longer the stored one | Conflict; nothing written |
+| any | `set` of an owner-set key | Invalid, naming the owner's operation; nothing written |
 
 ## Failure directions
 Serves: ADV-001
@@ -111,25 +137,26 @@ value, so it never disagrees with the data. No scheduled job of its own; the rel
 inside cluster's renewal.
 
 ## Audit
-Serves: ADV-001
+Serves: ADV-001, ADV-002
 | Action | When | Before | After |
 |---|---|---|---|
-| `setting.change` | every `writeSetting`, whether reached through `set`, `setWithin` or directly | the value replaced ("changed" for a secret) | the value stored ("changed" for a secret), the key, the scope server |
+| `setting.change` | every `writeSetting`, whether reached through `set`, `setWithin` or directly | the value replaced ("changed" for a secret) | the value stored ("changed" for a secret), the key, the scope server; the confirmed findings, in audit v1's field |
 
 ## Configuration
 Serves: ADV-001
 None of its own; every key is declared by its owning subsystem.
 
 ## Security considerations
-Serves: ADV-001
+Serves: ADV-001, ADV-002
 | Surface | Attacker | Abuse | Decision | Fails closed |
 |---|---|---|---|---|
-| `set` | a caller without the permission | change the board | gated on `board.administer`, or `server.connectivity` for a connectivity setting of that server | error means Denied |
+| `set` | a caller without the permission | change the board | gated on `settings.change` for the key's group, or `server.connectivity` for a connectivity setting of that server; an automation token bounded by the credential ceiling | error means Denied |
+| a loosening change | a sysop by mistake | open the board without seeing it | the engine computes the findings inside the change's transaction; the change needs the confirmation of exactly those findings, recorded in the entry, which is what exposes a tool that confirms on its own | no matching confirmation, nothing written |
 | secret values | a reader of the database or the audit log | learn a secret | stored sealed; audited as "changed"; never shown by the tools | none needed |
 | the snapshot | a server that misses a change | act on a stale value | every renewal carries the version; a change is never missed for longer than one renewal interval | Unavailable stops the server accepting callers (cluster) |
 
 ## Negative tests
-Serves: ADV-001
+Serves: ADV-001, ADV-002
 - `set` by the local operator of server A on a connectivity key of server B → Denied.
 - `set` by the local operator on a board-scoped key, or on a server-scoped key that is not a
   connectivity setting → Denied.
@@ -145,6 +172,17 @@ Serves: ADV-001
 - A secret key changed → the audit entry holds no value; the stored value is sealed; the
   tools show none.
 - A value failing validation → Invalid; the stored value unchanged.
+- A change with findings and no confirmation, or a confirmation computed for other findings →
+  Refused with the findings; nothing written.
+- A confirmation taken, then a concurrent change that alters the findings, then `set` with the
+  old confirmation → Refused; nothing written.
+- `set` with an expected revision older than the stored one → Conflict.
+- `set` of an owner-set key → Invalid; nothing written.
+- `list` by an actor allowed `settings.read` for one group only → only that group's keys.
+- `declare` naming an undeclared group → Invalid; the process stops.
+- An automation token with `listeners` among its change groups setting `http.public_listen` →
+  allowed through `settings.change`; without it → Denied, since it holds no
+  `server.connectivity`.
 - Two concurrent first `set`s of one absent key → one Conflict retried, both entries written,
   the later value stored.
 - A direct write of a setting row or the settings state row under a server login, outside
@@ -156,3 +194,5 @@ Serves: ADV-001
 
 ## Revision history
 - 2026-09-23: created for ADV-001.
+- 2026-09-23: settings groups, the loosening rule and confirmation, owner-set keys and revisions
+  for ADV-002.
