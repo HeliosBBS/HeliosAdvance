@@ -9,9 +9,19 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
 
 - **Service lifecycle**: `hadv-service` runs as a Windows service or a daemon; starts, stops,
   reloads, reports health. Depends on: servers, nodes and one board.
-- **Configuration**: every board setting has a key, default and kind; `hadv-config` (TUI) and
-  `hadv-config-gui` expose all of them with parity. Most settings are tunable there. Defaults
-  are secure by default; loosening is the sysop's explicit choice. Depends on: servers.
+- **Configuration**: every board setting has a key, default and kind; `hadv-config` (TUI and
+  CLI; the CLI is for automation) and `hadv-config-gui` expose all of them with parity. Most
+  settings are tunable there. Defaults are secure by default; loosening is the sysop's
+  explicit choice. Runs on the server or on a separate computer for remote administration
+  (the board hosted at a cloud provider, configured from the sysop's home computer as if it
+  were local). Configuration changes are held until applied. Sign-in by the Sysop role only;
+  no one can grant that permission to another role. Depends on: servers, remote
+  administration, classic text-mode interface.
+- **Classic text-mode interface**: the TUI tools have a classic BBS feel, similar to the
+  RemoteAccess configuration menu: a pull-down menu system with a modal dialog box for
+  settings; our own menu items and colour scheme; a bottom help line giving the field's valid
+  range; mouse support nice to have, not required. Shared by every TUI tool. Depends on:
+  nothing.
 - **Sensitive data encrypted at rest**: passwords hashed, secrets and other sensitive fields
   encrypted in the database, keys managed. Depends on: servers.
 - **Scripting layer**: all BBS logic runs in theme scripts through a public `bbs.*` API with a
@@ -33,14 +43,30 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
 ## Callers
 
 - **Telnet caller**: a caller connects over Telnet to a node and reaches the theme's welcome;
-  option negotiation; connection limits, per-source throttling, idle timeouts. Default port
+  option negotiation; connection limits, per-source throttling (one mechanism shared by every
+  caller surface, honouring the exempt-source list from accounts and login), idle timeouts.
+  Default port
   TCP/23, default binding all addresses, both changeable in `hadv-config`. Depends on:
   servers, scripting layer, theme packs. Touches the load tester.
 - **Accounts and login**: sign-up, login, sessions across servers, lockouts; a second factor
   when the account's role requires it. A user may set themselves private and then does not
   appear in who's-online except to a role holding the permission to see private users; a
   user never sees someone they have blocked in who's-online (the who's-online contract takes
-  the viewer as an input for this). Depends on: scripting layer, Telnet caller.
+  the viewer as an input for this). Lockout is board-wide policy with one implementation that
+  every surface's sign-in uses (Telnet, SSH, web, the Admin API), counted in the database so
+  moving between servers or surfaces resets nothing. Account #1, always the main sysop
+  account, is never locked; any other account locks after x failed attempts for x amount of
+  time, both configurable in `hadv-config`. An account holding the Sysop or Co-Sysop role
+  that is locked out a few times within a window is locked permanently until a sysop unlocks
+  it (a Sysop account only by a Sysop). Failed sign-ins also slow the source down on every
+  surface and every account: each failure from an address makes that address's next attempt
+  wait longer, and past a threshold the address is refused for a while; the server's own host
+  is slowed but never refused. A list of exempt sources, separate from the trusted proxy list,
+  covers addresses that stand for many callers (the HeliosSIP gateway, a load tester, a
+  shared address). Every tunable here has a floor and a ceiling; loosening any of them, or
+  adding an exempt source, warns loudly and needs the sysop's confirmation. The next
+  successful sign-in shows how many failures there were and from where. Depends on: scripting
+  layer, Telnet caller.
 - **Role-based access control**: roles carry permissions and configuration (upload/download
   ratio, whether 2FA is required, and the like). Every gate fails closed; every operator action
   is audited. Seeded roles, by fixed ID because names are editable: 1 Sysop, 2 Co-Sysop,
@@ -90,12 +116,20 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
 
 ## Operating the board
 
-- **Admin API**: what the configuration, console, user-editor and strings tools use; nothing
+- **Admin API**: being brainstormed as part of **remote administration** (ADV-002), with
+  operator sign-in and tokens: sign-in with 2FA, session tokens scoped for automation, the
+  audit naming the credential, long-lived console tokens whose lifetime is tunable in
+  `hadv-config` between a hard floor and ceiling. The Admin API is TCP only; HTTP/3 is
+  dropped for it. The original line: what the configuration,
+  console, user-editor and strings tools use; nothing
   but the engine touches the database. Default ports TCP/8443 (HTTPS) and UDP/8443 (QUIC),
   default binding all addresses, changeable in `hadv-config`. Depends on: RBAC.
 - **Public API**: the board's HTTP interface for clients, with its OpenAPI description.
   Depends on: web caller, accounts, RBAC. Touches the Portal and the load tester.
-- **Waiting-for-Caller console**: `hadv-console` and `hadv-console-gui`: who is on which node
+- **Waiting-for-Caller console**: `hadv-console` (TUI only; no CLI unless a use case appears)
+  and `hadv-console-gui`, run on the server or remotely; long-lived tokens; the GUI minimises
+  to the taskbar and can start minimised so it starts after login. Depends on: remote
+  administration, classic text-mode interface. The original line: who is on which node
   on which server, activity; spawns the user editor. Depends on: Admin API.
 - **User editor**: `hadv-useredit` and `hadv-useredit-gui`, spawned from the console or run
   alone. Depends on: RBAC, Admin API.
@@ -113,7 +147,8 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   systemd credentials, else a service-user-only file with a warning) and `hadv-setup` says
   which tier it got. The earlier design is read for the questions it settled, not for
   answers. Depends on: servers.
-- **First-run setup**: `hadv-setup` (TUI only) takes a fresh install to a running board:
+- **First-run setup**: `hadv-setup` (TUI and CLI; the CLI supports automation; runs only
+  locally on the server) takes a fresh install to a running board:
   sysop account with its second factor enrolled, listeners, database, certificates. Depends on:
   servers, certificates, RBAC, second factor.
 - **Installation**: Inno Setup on Windows, WinGet wrapping it, RPM and DEB on Linux, a
