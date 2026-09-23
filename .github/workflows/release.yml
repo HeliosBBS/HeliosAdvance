@@ -10,8 +10,8 @@ jobs:
   release:
     uses: HeliosBBS/.github/.github/workflows/release.yml@main
     with:
-      binary: hadv
-      package: ./cmd/hadv
+      binary: hadv-service
+      package: ./cmd/hadv-service
     permissions:
       contents: write
       id-token: write

@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Pascal Fairchild
 // SPDX-License-Identifier: AGPL-3.0-only
 
-// Command hadv is the Helios Advance BBS engine.
+// Command hadv-service is the Helios Advance BBS engine.
 package main
 
 import (
@@ -42,6 +42,6 @@ func main() {
 		fmt.Println(buildVersion())
 		return
 	}
-	fmt.Fprintln(os.Stderr, "hadv: nothing to run yet; see CONSTITUTION.md")
+	fmt.Fprintln(os.Stderr, "hadv-service: nothing to run yet; see CONSTITUTION.md")
 	os.Exit(2)
 }

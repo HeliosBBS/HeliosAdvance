@@ -1,8 +1,8 @@
 # Build output
 /bin/
 /dist/
-/hadv
-/hadv.exe
+/hadv-service
+/hadv-service.exe
 
 # Go test and coverage output
 *.test
