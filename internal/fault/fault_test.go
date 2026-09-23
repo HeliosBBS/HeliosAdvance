@@ -2,6 +2,7 @@ package fault
 
 import (
 	"errors"
+	"fmt"
 	"testing"
 )
 
@@ -22,10 +23,12 @@ func TestClassOf(t *testing.T) {
 		{"Denied direct", Denied, DeniedClass},
 		{"NotFound direct", NotFound, NotFoundClass},
 		{"Fatal direct", Fatal, FatalClass},
-		{"Unavailable wrapped once", errors.Join(errors.New("context"), Unavailable), UnavailableClass},
-		{"Conflict wrapped twice", errors.Join(errors.New("a"), errors.Join(errors.New("b"), Conflict)), ConflictClass},
-		{"Invalid wrapped multiple times", errors.Join(errors.New("x"), errors.Join(Refused, Invalid)), InvalidClass},
-		{"Fatal wrapped with others", errors.Join(NotFound, Fatal, errors.New("info")), FatalClass},
+		{"Unavailable wrapped with %w", fmt.Errorf("context: %w", Unavailable), UnavailableClass},
+		{"Conflict wrapped twice with %w", fmt.Errorf("outer: %w", fmt.Errorf("inner: %w", Conflict)), ConflictClass},
+		{"Unavailable wrapped once with errors.Join", errors.Join(errors.New("context"), Unavailable), UnavailableClass},
+		{"Conflict wrapped twice with errors.Join", errors.Join(errors.New("a"), errors.Join(errors.New("b"), Conflict)), ConflictClass},
+		{"Invalid wrapped multiple times", errors.Join(errors.New("x"), errors.Join(Refused, Invalid)), RefusedClass},
+		{"Fatal wrapped with others", errors.Join(NotFound, Fatal, errors.New("info")), NotFoundClass},
 	}
 
 	for _, tt := range tests {

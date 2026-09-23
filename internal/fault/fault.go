@@ -1,5 +1,7 @@
 package fault
 
+import "errors"
+
 type Class int
 
 const (
@@ -52,25 +54,21 @@ func ClassOf(err error) Class {
 	if err == nil {
 		return None
 	}
-	return classOfMax(err)
-}
-
-func classOfMax(err error) Class {
-	// Check the error directly
-	if ce, ok := err.(classError); ok {
-		return ce.class
-	}
-
-	// Unwrap and check each wrapped error, return the maximum class found
-	maxClass := None
-	if uw, ok := err.(interface{ Unwrap() []error }); ok {
-		for _, e := range uw.Unwrap() {
-			class := classOfMax(e)
-			if class > maxClass {
-				maxClass = class
-			}
+	for {
+		if ce, ok := err.(classError); ok {
+			return ce.class
 		}
+		u := errors.Unwrap(err)
+		if u == nil {
+			if uw, ok := err.(interface{ Unwrap() []error }); ok {
+				for _, e := range uw.Unwrap() {
+					if class := ClassOf(e); class != None {
+						return class
+					}
+				}
+			}
+			return None
+		}
+		err = u
 	}
-
-	return maxClass
 }
