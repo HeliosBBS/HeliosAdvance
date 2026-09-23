@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Pascal Fairchild
+# SPDX-License-Identifier: AGPL-3.0-only
 #Requires -Version 7
 <#
 The unattended loop: one issue task per iteration, fresh context, as the organisation's
