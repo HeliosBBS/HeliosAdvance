@@ -25,9 +25,9 @@ the principles the whole system works from.
 | Project | What it is | Licence |
 |---|---|---|
 | [HeliosDoorKit](https://github.com/HeliosBBS/HeliosDoorKit) | Wire protocol and multi-language SDK for BBS doors. Not tied to this BBS. | Apache-2.0 |
+| HeliosDoors | A BBS-agnostic door hosting service: a separate daemon that runs doors and takes callers from any BBS that supports it. This engine hands its callers to it rather than launching doors itself. | to be decided |
 | [HeliosPortal](https://github.com/HeliosBBS/HeliosPortal) | Progressive web app with an address book for many Helios Advance boards. | AGPLv3-only |
 | [HeliosSIP](https://github.com/HeliosBBS/HeliosSIP) | SIP-to-SSH gateway, so a caller with a modem and a VoIP line can reach any SSH or Telnet host. | AGPLv3-only |
-| HeliosDoors | Doors built on the Door Kit. | to be decided |
 | HeliosLoadTest | Load-test harness for a running board. Private, because it is a load generator. | AGPLv3-only |
 
 Each project's interface to the engine is a protocol, a wire format, or nothing at all.
