@@ -373,6 +373,9 @@ abstractions, no rule the specification does not state, comments only where the 
 say, readable names.
 
 Report every finding as a numbered line: the file, what is wrong, the fix you expect. Say nothing about what is fine.
+A rule the specification does not state is not a finding: do not ask for a precedence, a default or a policy the
+documents never give, unless the code cannot be correct without one, in which case name the sentence that needs it. The
+plan already made every decision; your job is whether the code matches it.
 End your output with exactly one line, and nothing after it:
   REVIEW: PASS       no finding
   REVIEW: FINDINGS   one or more findings above
