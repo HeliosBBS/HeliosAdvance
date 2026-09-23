@@ -5,16 +5,18 @@ import (
 	"fmt"
 	"os"
 	"runtime/debug"
+
+	"github.com/heliosbbs/heliosadvance/internal/version"
 )
 
-// version is the release tag, stamped by the release build; otherwise the
+// releaseTag is the release tag, stamped by the release build; otherwise the
 // exact commit Go recorded, which is what the AGPLv3 section 13 source offer
 // must be able to name.
-var version = ""
+var releaseTag = ""
 
 func buildVersion() string {
-	if version != "" {
-		return version
+	if releaseTag != "" {
+		return releaseTag
 	}
 	info, ok := debug.ReadBuildInfo()
 	if !ok {
@@ -36,7 +38,7 @@ func buildVersion() string {
 
 func main() {
 	if len(os.Args) > 1 && os.Args[1] == "version" {
-		fmt.Println(buildVersion())
+		fmt.Printf("%s (%s)\n", version.Version, buildVersion())
 		return
 	}
 	fmt.Fprintln(os.Stderr, "hadv: nothing to run yet; see CONSTITUTION.md")
