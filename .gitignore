@@ -36,5 +36,6 @@ issues.jsonl
 *.local.md
 *.local.yml
 *.local.yaml
+*.local.json
 .env
 .env.*
