@@ -30,7 +30,7 @@ Permissions this corpus declares, and who holds them:
 |---|---|---|
 | `board.administer` | none | a sysop account |
 | `board.create` | none | the first-run operator: the principal whose administrator credential the database accepted through database-access v1 `openWith` |
-| `board.upgrade` | none | the first-run operator, at an upgrade |
+| `board.upgrade` | none | the first-run operator |
 | `server.connectivity` | a server | the local operator of that server, and a sysop account |
 | `whos_online.view` | none | a caller that sessions v1 vouches for as logged in, and a sysop account |
 | `audit.read` | none | a sysop account |

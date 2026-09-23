@@ -20,14 +20,14 @@ Provided, **configuration v1**:
 | Operation | Inputs | Outputs | Errors |
 |---|---|---|---|
 | declare | at start-up only: key, kind, scope (`board` or `server`), default, validation rule, apply mode (`live` or `restart`), secret (yes or no), connectivity setting (yes or no; allowed only with scope `server`) | none | Invalid (duplicate key, or a board-scoped connectivity setting: a start-up defect; the process stops with Fatal) |
-| get | key; for a server-scoped key this server is implied | the value from the snapshot, or the default when none is stored | none |
+| get | key; for a server-scoped key this server is implied | the value from the snapshot; the default when none is stored, or when the stored value fails the declared validation | none |
 | set | actor, key, target server (for a server-scoped key), value | the value stored | Denied, Invalid, NotFound, Conflict, Unavailable |
 | restartNeeded | server | the restart-mode keys, board-scoped or scoped to that server, changed since that server's process loaded its first snapshot | Unavailable |
 | refresh | the settings version reported by the last lease renewal | none | Unavailable |
 | read | inside a caller's transaction: key, target server | the stored value, or the default when none is stored | NotFound |
-| setWithin | inside a caller's transaction that already holds the settings state row: actor, key, target server, value | the value stored; the caller's transaction carries the audit entry | Invalid, NotFound |
+| setWithin | inside a caller's transaction that already holds the settings state row: actor, key, target server, value | the value stored; records its own entry | Invalid, NotFound |
 | initWithin | inside createBoard's transaction | the settings state row, created | Conflict (exists) |
-| list | actor, target server | every declared key with its kind, scope, apply mode, default and the stored value for that target (a secret value withheld) | Denied, Unavailable |
+| list | actor, target server | every declared key with its kind, scope, apply mode, default and the stored value for that target (a secret value withheld; a stored value failing validation flagged as invalid) | Denied, Unavailable |
 
 Gate for `set` and `list`, through access-control v1: `board.administer`; or
 `server.connectivity` for the target server when the key is a connectivity setting (`list`
@@ -65,7 +65,10 @@ Two sysops changing one existing key: the second waits for the first, and each e
 the value it truly replaced. `setWithin` does the same inside the caller's transaction. `set`,
 `setWithin` and `initWithin` are database-side operations (the architecture's login tiers):
 a server login's direct write to a setting row or the settings state row is refused by the
-database, so every stored value passed validation and carries its entry.
+database, so every stored value carries its entry and moved the settings version.
+Validation against the declaration is the tools' job: `set` reports Invalid before writing;
+a value a direct call stores outside its declaration is read as the default by `get` and
+flagged by `list`, so no reader acts on it.
 
 The server's started settings version is a field of cluster's Server entity; `restartNeeded`
 compares against it.
@@ -141,6 +144,9 @@ Serves: ADV-001
   the later value stored.
 - A direct write of a setting row or the settings state row under a server login, outside
   `set` → rejected by the database; the stored value unchanged.
+- `cluster.lease_timeout_renewals` stored as 0 by a direct `set` under a server login → its
+  entry exists; every server's `get` returns the default and no lease shortens; `list` shows
+  the stored value as invalid; a later valid `set` replaces it.
 
 ## Revision history
 - 2026-09-23: created for ADV-001.

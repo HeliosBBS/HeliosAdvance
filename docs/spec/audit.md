@@ -18,7 +18,7 @@ Provided, **audit v1**:
 
 | Operation | Inputs | Outputs | Errors |
 |---|---|---|---|
-| record | inside the caller's transaction: actor, origin server (optional), action name, target server (optional), before, after | none | whatever the transaction reports; the caller's action fails with it |
+| record | inside the caller's transaction (a database-side operation calls it inside itself): actor, origin server (optional), action name, target server (optional), before, after | none | whatever the transaction reports; the caller's action fails with it |
 | list | actor; optional filters: action name, target server, time range; a page size; a cursor (the entry ID to continue below, or none for the newest) | entries in descending entry ID, and the cursor for the next page | Denied, Invalid (page size out of bounds), Unavailable |
 
 `list` requires `audit.read` through access-control v1; any error from that check is Denied.

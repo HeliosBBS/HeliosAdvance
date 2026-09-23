@@ -82,36 +82,40 @@ realised by the stack:
   comparison of times across servers.
 - **An increasing identifier**, as the glossary defines it.
 - **A login** is what a program authenticates to the database with. Every program on a
-  server's host authenticates with that server's login, except the setup tool at first run
-  and at an upgrade, which uses the administrator credential through database-access's
-  `openWith`. Rights come in three tiers, and the database enforces every one of them:
+  server's host authenticates with that server's login, except the setup tool, which uses the
+  administrator credential through database-access's `openWith` at first run, at an upgrade
+  and for a secret reset. Rights come in three tiers, and the database enforces every one:
   - **A server login** is bound to one server ID. It reads everything a server needs. It
-    writes directly only its own server row's fields other than identity, names, status and
-    removal (that is: the lease, version, informational, record and reported fields), and
-    the occupant fields and claim generation of the node rows it owns; it inserts audit
-    entries; and it calls the database-side operations. The database refuses every other
-    write from it: another server's row, any node row it does not own, the board row, a
-    layout row, a setting row, the settings state, an applied-change row, a login.
+    writes directly only these fields of its own server row: lease generation, lease expires
+    at, lease timeout used, engine version, operating system and processor architecture,
+    transport, database address, trust-anchor fingerprint, login name, record version,
+    started settings version, and the reported HTTP fields; and the occupant fields and claim
+    generation of the node rows it owns. It inserts audit entries, and it calls the
+    database-side operations. The database refuses every other write from it: any other
+    field of its own row, another server's row, a node row it does not own, any node row's
+    owner or number, an inserted server or node row, the board row, a layout row, a setting
+    row, the settings state, an applied-change row, a login.
   - **A database-side operation** runs inside the database with the data model owner's
-    rights and checks its own preconditions, so a mistaken or forged call cannot corrupt the
-    layout, mint a hidden login or lock out a live server, and each records the server it
-    ran from. They are the layout operations (createBoard, addServer, setNodeCount,
-    applyReplan, removeServer and removal's completion), the settings writes (`set`,
-    `setWithin`, `initWithin`) and the login operations cluster states. Any server login may
-    call them: a server holding a login can therefore run a registry operation directly, past
+    rights. Every one takes the actor as an input, checks its preconditions against row
+    state, and records its own audit entry through audit v1 inside itself, naming the actor
+    it was given and, as origin server, the server whose login called it. A mistaken or
+    forged call therefore cannot corrupt the layout or mint an unrecorded login, and what it
+    did is on the record. They are the layout operations (createBoard, addServer,
+    setNodeCount, applyReplan, removeServer and removal's completion), the settings writes
+    (`set`, `setWithin`, `initWithin`), cluster's login operations, and applyChanges, which
+    alone runs only under the administrator credential. Any server login may call the
+    others: a server holding a login can therefore run a registry operation directly, past
     the access-control gate, which is the trust the brief grants a server login; the gate
-    bounds the tools and the sysop, and the operation's audit entry names the origin server.
+    bounds the tools and the sysop, and the entry names where the call came from.
+    Validating a setting's value against its declaration is the tools' job, not the
+    operation's; configuration states how a stored value outside its declaration is read.
   - **The administrator credential** is held by no program. Only under it are the entities,
     constraints, roles and database-side operations created or changed, applied-change rows
-    written, and a server's login secret reset. The engine never applies a data-model change:
-    at admission it refuses to start when a change its version requires is not recorded as
-    applied, naming the upgrade to run.
+    written, and a server's login secret reset.
 
-  A login is created only inside the operation that creates its server row; disabling one
-  takes part in the transaction that removes its server and refuses new connections from
-  commit; ending its open connections and revoking it happen after commit and are retried
-  until done. Audit entries and applied-change rows are owned by the data model's owner, so
-  no server login can change or delete one.
+  Audit entries and applied-change rows are owned by the data model's owner, so no server
+  login can change or delete one. The login lifecycle is cluster's, as its login operations
+  and removal state; what an engine does about an unapplied change is cluster's version rule.
 - **A notification** is delivered to every connected server after a commit, at most once,
   and may be lost; nothing in this corpus depends on receiving one.
 

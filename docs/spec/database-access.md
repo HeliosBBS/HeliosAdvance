@@ -22,7 +22,7 @@ Provided, **database-access v1**, to every subsystem and program:
 | Operation | Inputs | Outputs | Errors |
 |---|---|---|---|
 | open | none; the record is read from its fixed location on the host | a connection | Fatal (record missing, malformed, over-exposed, or without a key-encryption key; login rejected; transport cannot be established as the record requires), Unavailable (no answer yet; the connection keeps being attempted) |
-| openWith | the setup tool only, at first run and at an upgrade: address, transport, trust anchor, and the administrator credential, never stored or logged | a connection under that credential, subject to the same transport decision | Fatal (as `open`), Invalid (transport invalid for the address), Unavailable |
+| openWith | the setup tool only, at first run, at an upgrade and for a secret reset: address, transport, trust anchor, and the administrator credential, never stored or logged | a connection under that credential, subject to the same transport decision | Fatal (as `open`), Invalid (transport invalid for the address), Unavailable |
 | transaction | the work to do; a deadline (the operation deadline unless the caller states another) | the work's result | Unavailable, Conflict, and whatever the work reports |
 | now | inside a transaction | the database clock | |
 | lockBoard | inside a transaction | the cluster mutex, held until the transaction ends | Unavailable |
@@ -58,10 +58,15 @@ secret into the record; discards the administrator credential.
 An upgrade, in order: the local operator installs the new version's programs on one host;
 the setup tool opens a connection with `openWith` and the administrator credential, calls
 cluster's applyChanges, and discards the credential; the engines are then restarted, one
-host at a time. An engine started before the upgrade is applied refuses to start, naming it.
+host at a time. What an engine started before the upgrade does is cluster's version rule.
+
+A secret reset, in order: the setup tool opens a connection with `openWith` and the
+administrator credential; calls cluster's resetSecret for this server; writes the new secret
+into the record; discards the credential; restarts the engine.
 
 The record is written by the setup tool (first run, join, and any later change the local
-operator makes to restore connectivity: address, trust anchor, transport, login and secret)
+operator makes to restore connectivity: address, trust anchor, transport, and the secret
+through a secret reset)
 and read by the programs on that host. The transport is valid only as follows: `tls` with an
 address literal or a name; `plaintext` only with a loopback address literal or a local socket.
 A local socket is always `plaintext`, because it carries no name to verify. After writing the
