@@ -17,10 +17,12 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
 - **Scripting layer**: all BBS logic runs in theme scripts through a public `bbs.*` API with a
   deprecation contract; the engine has no BBS logic of its own. Depends on: servers,
   configuration.
-- **Theme packs**: scripts plus terminal text and graphics plus web code, in one pack;
-  installed, selected, defaulted and disabled by the sysop. Two ship. The modern theme is the
-  fallback for everything, cannot be deleted, is not supported if edited; a sysop can disable it
-  from selection and make another theme the default. Where theme files live (database or
+- **Theme packs**: scripts plus terminal text and graphics plus web code, in one pack. A
+  board installs several; each user picks the one they use, and a new user starts on the pack
+  the sysop has flagged as the default; the sysop installs, flags and disables packs. Two ship.
+  The modern theme is the fallback every other pack falls back to, cannot be deleted, is not
+  supported if edited; a sysop can disable it from selection and flag another pack as the
+  default. Where theme files live (database or
   disk, and how every server gets them) is decided here, not assumed. Depends on: scripting
   layer.
 - **Certificates**: `hadv-cert` (TUI only) generates self-signed certificates and installs
