@@ -164,6 +164,11 @@ Recurring shapes ordinary review misses; every review prompt names them.
   you were not asked to touch are not yours to sweep.
 - Supported targets: `linux/amd64`, `linux/arm64`, `windows/amd64`; everything builds on all
   three.
+- **Licence header.** Every source file this project writes, in any language, opens with
+  `SPDX-FileCopyrightText: <year first written> Pascal Fairchild` and
+  `SPDX-License-Identifier: AGPL-3.0-only` in that language's comment syntax, and nothing
+  else in the header; `goheader` enforces it for Go. Sysop-authored scripts under the
+  Scripting API Exception carry whatever their author chooses.
 - **Go practices a linter cannot decide** (what it can is in `.golangci.yml`, enforced by
   `make check`): every goroutine has an owner and stops when its context ends; an error is
   returned or logged, never both; no panic crosses a package boundary; anything read from the
@@ -177,6 +182,24 @@ Recurring shapes ordinary review misses; every review prompt names them.
 
 - State assumptions before coding; if several readings exist, present them.
 - Minimum code that solves the problem: no unrequested features, no single-use abstractions.
+- **Principles, and how they apply here.** Where two pull apart, the earlier wins.
+  - *Secure by design* over all of the below: a check stays whatever it costs in size.
+  - *YAGNI*: build what the plan's task asks and nothing for a feature not yet briefed.
+  - *KISS*: the boring shape a stranger reads at 3 a.m.; clever is a finding in review.
+  - *DRY is about knowledge, not text*: one rule, key, limit or mechanism has one home and
+    is referred to elsewhere (the specs' "stated once, in its owner"); two pieces of code
+    that merely look alike stay apart until a third shows the shared rule (the rule of three).
+  - *Separation of concerns*: code follows the subsystem that owns the behaviour in
+    `docs/spec/`; one package does not reach into another's tables or state.
+  - *Least astonishment*: a name, default or error says what it does; nothing is surprising
+    to a sysop, a caller or the next reader.
+  - *Composition over inheritance* and *small interfaces*: Go's own grain; embed and compose,
+    and an interface has the methods its one consumer calls.
+  - *Make illegal states unrepresentable*: types, constructors and database constraints stop
+    a bad value from existing, rather than every caller checking for it.
+  - *Fail fast* at start-up and at trust boundaries; *fail closed* at gates.
+  - Not the boy scout rule: leave the campsite as found outside the task, and say what you
+    saw; scope discipline keeps diffs reviewable.
 - Touch only what the request needs; remove what your change made unused; leave pre-existing
   dead code alone and say so.
 - Read a file's exports and callers before adding to it. "Looks orthogonal" is the most

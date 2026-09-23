@@ -10,6 +10,7 @@ linters:
     - depguard
     - errorlint
     - forbidigo
+    - goheader
     - gosec
     - nilerr
     - noctx
@@ -19,6 +20,15 @@ linters:
     - sqlclosecheck
     - tparallel
   settings:
+    # Every Go file carries the licence notice, so a file copied out of the repository
+    # still says what it is under; the year is the file's first.
+    goheader:
+      values:
+        regexp:
+          year: 20\d\d
+      template: |-
+        SPDX-FileCopyrightText: {{ year }} Pascal Fairchild
+        SPDX-License-Identifier: AGPL-3.0-only
     depguard:
       rules:
         # A new module is a new line here, in the same pull request as its written
