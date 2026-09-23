@@ -17,10 +17,12 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
 - **Scripting layer**: all BBS logic runs in theme scripts through a public `bbs.*` API with a
   deprecation contract; the engine has no BBS logic of its own. Depends on: servers,
   configuration.
-- **Theme packs**: scripts plus terminal text and graphics plus web code, in one pack;
-  installed, selected, defaulted and disabled by the sysop. Two ship. The modern theme is the
-  fallback for everything, cannot be deleted, is not supported if edited; a sysop can disable it
-  from selection and make another theme the default. Where theme files live (database or
+- **Theme packs**: scripts plus terminal text and graphics plus web code, in one pack. A
+  board installs several; each user picks the one they use, and a new user starts on the pack
+  the sysop has flagged as the default; the sysop installs, flags and disables packs. Two ship.
+  The modern theme is the fallback every other pack falls back to, cannot be deleted, is not
+  supported if edited; a sysop can disable it from selection and flag another pack as the
+  default. Where theme files live (database or
   disk, and how every server gets them) is decided here, not assumed. Depends on: scripting
   layer.
 - **Certificates**: `hadv-cert` (TUI only) generates self-signed certificates and installs
@@ -31,10 +33,14 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
 ## Callers
 
 - **Telnet caller**: a caller connects over Telnet to a node and reaches the theme's welcome;
-  option negotiation; connection limits, per-source throttling, idle timeouts. Depends on:
+  option negotiation; connection limits, per-source throttling, idle timeouts. Default port
+  TCP/23, default binding all addresses, both changeable in `hadv-config`. Depends on:
   servers, scripting layer, theme packs. Touches the load tester.
 - **Accounts and login**: sign-up, login, sessions across servers, lockouts; a second factor
-  when the account's role requires it. Depends on: scripting layer, Telnet caller.
+  when the account's role requires it. A user may set themselves private and then does not
+  appear in who's-online except to a role holding the permission to see private users; a
+  user never sees someone they have blocked in who's-online (the who's-online contract takes
+  the viewer as an input for this). Depends on: scripting layer, Telnet caller.
 - **Role-based access control**: roles carry permissions and configuration (upload/download
   ratio, whether 2FA is required, and the like). Every gate fails closed; every operator action
   is audited. Seeded roles, by fixed ID because names are editable: 1 Sysop, 2 Co-Sysop,
@@ -46,18 +52,27 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   cannot be deleted; editable. Guest: not signed in; cannot be deleted; editable. New User:
   baseline probationary access; can be deleted; fully editable. Account #1 is always the main
   sysop account and owner of the system. The Sysop role requires 2FA by default; the sysop may
-  turn that off for the role. Depends on: accounts and login.
+  turn that off for the role. Sysop and Co-Sysop hold the permission to see private users in
+  who's-online by default. Depends on: accounts and login.
 - **Second factor**: TOTP; passkeys where the surface allows; required per role; the initial
   #1 Sysop enrols during first-run setup. Depends on: accounts, RBAC. Touches the Portal.
-- **Telnet over TLS caller**: the Telnet experience over a TLS-wrapped listener. Depends on:
+- **Telnet over TLS caller**: the Telnet experience over a TLS-wrapped listener. Default port
+  TCP/992, default binding all addresses, both changeable in `hadv-config`. Depends on:
   certificates, Telnet caller.
-- **SSH caller**: the same over SSH, host keys from certificates, option negotiation.
-  Depends on: certificates, Telnet caller. Touches the load tester and the SIP gateway.
+- **SSH caller**: the same over SSH, host keys from certificates, option negotiation. Default
+  port TCP/22, default binding all addresses, both changeable in `hadv-config`. The sysop
+  guide must explain that on a Linux host the system's own SSH service usually holds TCP/22,
+  and how to move that service to another port (or the board's SSH to another port) so the
+  two do not conflict. Depends on: certificates, Telnet caller. Touches the load tester and
+  the SIP gateway.
 - **SSH public-key login**: a user uploads a public key (on the web, or by file transfer on a
   classic connection) and logs in with it; a required second factor still applies. Depends
   on: SSH caller, accounts, second factor, file transfer.
 - **Web caller**: a browser reaches the board over HTTP, HTTPS and HTTP/3 and gets the
-  selected theme's web side. Depends on: scripting layer, theme packs, certificates.
+  selected theme's web side. Default ports TCP/80 (HTTP), TCP/443 (HTTPS), UDP/443 (QUIC);
+  HTTP redirects to HTTPS by default; default binding all addresses; ports, binding and the
+  redirect all changeable in `hadv-config`. Depends on: scripting layer, theme packs,
+  certificates.
 - **Terminal-in-browser rendering**: the classic theme's terminal experience rendered in the
   browser: ANSI to HTML with animation and ANSI music. Depends on: web caller.
 - **Modern theme**: rich HTML on the web and a lightbar ANSI system on the terminal; shipped;
@@ -76,7 +91,8 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
 ## Operating the board
 
 - **Admin API**: what the configuration, console, user-editor and strings tools use; nothing
-  but the engine touches the database. Depends on: RBAC.
+  but the engine touches the database. Default ports TCP/8443 (HTTPS) and UDP/8443 (QUIC),
+  default binding all addresses, changeable in `hadv-config`. Depends on: RBAC.
 - **Public API**: the board's HTTP interface for clients, with its OpenAPI description.
   Depends on: web caller, accounts, RBAC. Touches the Portal and the load tester.
 - **Waiting-for-Caller console**: `hadv-console` and `hadv-console-gui`: who is on which node

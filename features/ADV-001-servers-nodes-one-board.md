@@ -33,7 +33,8 @@ off who's-online.
 
 - When a server is configured with a node count, the system shall assign it a contiguous
   range of board-wide node numbers following the ranges already assigned, and shall keep that
-  range until the sysop re-plans the layout.
+  range's start and position until the sysop re-plans the layout; a count change acts on that
+  server's range alone and never moves another server's numbers.
 - If the sysop re-plans the layout while a caller is on an affected node, then the system
   shall refuse the re-plan and say which nodes are in use.
 - When a caller logs in on a server with a free node, the system shall give them the lowest
@@ -50,8 +51,9 @@ off who's-online.
 - While a server runs, it shall renew its lease in the database on the lease interval.
 - If a server's lease expires, then the system shall free its nodes, end its sessions, and
   remove its callers from who's-online on every server within the lease timeout.
-- When any caller or sysop views who's online, the system shall show every caller on every
-  server as one board.
+- When any logged-in caller or sysop views who's online, the system shall show every caller on
+  every server as one board; before login, a theme may show at most the board-wide count of
+  callers online.
 
 ### The database
 
@@ -62,8 +64,13 @@ off who's-online.
   certificate verified; if the database is on the same host and the sysop has explicitly
   allowed it, then plaintext shall be permitted.
 - While a server holds per-server settings, they shall live in the database keyed by that
-  server; a server's disk shall hold only its identity, its own database credentials and the
-  board's key-encryption key, protected by the operating system's best available tier.
+  server; a server's disk shall hold only its bootstrap record (its identity, the database's
+  address and trust anchor, its own database login, its transport choice, and the board's
+  key-encryption key), protected by the operating system's best available tier.
+- When the local operator runs the setup tool on a server's host, the system shall let them
+  change only what restores that server's connectivity (its bootstrap record and its listen
+  addresses) and stop or start it; everything else needs a sysop through the runtime
+  configuration tools.
 
 ### Health
 
@@ -75,14 +82,21 @@ off who's-online.
 
 1. **The database wire.** Attacker: anyone on the network between a server and the database.
    Abuse: reading password hashes, messages and session data in transit, or altering them.
-   Decision: TLS with the database's certificate verified; plaintext only same-host and by
-   explicit sysop choice, visible in the configuration tools. Why: secure by default, with the
-   one loosening a single-machine board reasonably wants. Fails closed: a server that cannot
-   establish TLS does not start.
+   Decision: TLS with the database's certificate verified; plaintext only to a loopback
+   address or a local socket, chosen by the local operator in the setup tool on that host and
+   held in the bootstrap record, so no credential is ever sent before the choice is known;
+   the configuration tools show each server's actual transport. Why: secure by default, with
+   the one loosening a single-machine board reasonably wants, made where it can be made
+   safely. Fails closed: a server that cannot establish TLS does not start.
 2. **The database credentials are the board's root of trust.** Attacker: whoever obtains them.
    Abuse: they are a server, with everything a server can do. Decision: this feature does not
-   weaken that; the join feature is the only gate that hands them out, and a server's local
-   file holds nothing beyond its identity, its own credentials and the key-encryption key. Why:
+   weaken that; first-run setup (which creates the board and its first login with the
+   database administrator's credential, supplied once by the local operator and never stored
+   or logged) and the join feature are the only tools that hand them out; a server, trusted
+   as a server, can add one through the same operation, and the entry names it; the setup
+   tool, under the same administrator credential, can reset a server's secret, recorded as
+   `login.reset`; a server's local file holds nothing beyond its bootstrap record, and
+   removing a server revokes its own database login. Why:
    one trust boundary, guarded once. Fails closed: no credentials, no server.
 3. **A misbehaving or misconfigured server.** Attacker: a server that lies about its node
    count, renews a lease it should not, or claims nodes outside its range. Abuse: exhausting
@@ -122,7 +136,7 @@ off who's-online.
 | Lease renewal interval | calibration target | a few seconds |
 | Lease timeout | sysop tunable | three missed renewals |
 | Version skew between servers | fixed policy backstop | one minor version |
-| Plaintext to the database | sysop tunable, off | same-host only |
+| Plaintext to the database | local operator's choice in the setup tool, off | loopback or local socket only |
 | Health detail to untrusted callers | fixed policy backstop | up or down, nothing more |
 
 ## Non-goals

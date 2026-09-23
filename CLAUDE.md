@@ -24,7 +24,7 @@ builds, the developer reviews briefs and plans in full and diffs by sample.
 | `CONSTITUTION.md` | what is specific to the engine; the shared principles come from the plugin |
 | `features/` | feature briefs, one file per feature, developer-owned |
 | `docs/spec/` | the derived corpus: `architecture.md` and one file per subsystem, language-neutral |
-| `docs/stack.md` | the stack decision (languages, store, physical mapping, tooling); never cited by a spec |
+| `docs/stack.md` | the stack decision (languages, database, physical mapping, tooling); never cited by a spec |
 | `docs/sysop/` | the board operator's guide, published to GitHub Pages |
 | `cmd/`, `internal/` | the engine's Go source |
 | `automation/` | the unattended loop |
@@ -131,7 +131,7 @@ Recurring shapes ordinary review misses; every review prompt names them.
 4. Send on a closed channel in fan-out code.
 5. A doc comment asserting the opposite of the behaviour.
 6. Security-critical logic duplicated across surfaces.
-7. A multi-step store operation without a transaction.
+7. A multi-step database operation without a transaction.
 8. A state-changing operator action with no audit entry.
 9. A regression test that still passes when the fix is reverted.
 
