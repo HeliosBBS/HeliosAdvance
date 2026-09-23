@@ -1,0 +1,6 @@
+{
+  "appId": 0,
+  "installationId": 0,
+  "keyPath": "path to the GitHub App's private key, outside every repository",
+  "base": "D:\\GitRepos\\Claude"
+}
