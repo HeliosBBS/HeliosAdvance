@@ -11,7 +11,14 @@ same if this file changed; this file says how each property they state is realis
   `bbs.*` API.
 - **Free Pascal with Lazarus** for the cross-platform graphical utilities, which have feature
   parity with their text-mode counterparts except where a platform makes something
-  impossible.
+  impossible. A Lazarus program cannot link the engine's packages, so the graphical runtime
+  configuration tool holds the second implementation of database-access v1 and of the
+  access-control check that the architecture permits: libpq (the PostgreSQL licence) through
+  Lazarus's SQLdb, with the connection's TLS mode set to verify the server certificate against
+  the record's trust anchor and the protocol floor at TLS 1.2; the record read at the host's
+  tier through the platform's data-protection interface; FPCUnit tests over the same
+  negative-test tables the engine's tests use. The developer writes the forms; a model writes
+  only the non-visual Pascal.
 
 ## The database
 
@@ -43,7 +50,8 @@ by a migration that needs it.
 ## Build and tooling
 
 `make check` is the one definition of green: build, vet, lint, tests (race detector where a C
-compiler exists), vulnerability scan. Supported targets: `linux/amd64`, `linux/arm64`,
+compiler exists), vulnerability scan, and, where the repository holds a Lazarus project, its
+`lazbuild` build and FPCUnit tests. Supported targets: `linux/amd64`, `linux/arm64`,
 `windows/amd64`. Builds are reproducible and stamped with the exact commit; releases carry a
 build-provenance attestation and a software bill of materials.
 
