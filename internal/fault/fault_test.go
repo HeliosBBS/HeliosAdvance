@@ -39,6 +39,9 @@ func TestClassOf(t *testing.T) {
 		{"depth-first through two %w verbs", fmt.Errorf("%w %w", fmt.Errorf("x: %w", NotFound), Refused), NotFound, true},
 		{"zero Class wrapped carries no class", fmt.Errorf("w: %w", Class("")), "", false},
 		{"undeclared Class conversion wrapped carries no class", fmt.Errorf("w: %w", Class("granted")), "", false},
+		{"a zero Class before a declared one is skipped", errors.Join(Class(""), Denied), Denied, true},
+		{"an undeclared Class before a declared one is skipped", fmt.Errorf("%w: %w", Class("granted"), Denied), Denied, true},
+		{"a zero Class deep in a join does not hide a later class", fmt.Errorf("map: %w", errors.Join(fmt.Errorf("db: %w", Class("")), Unavailable)), Unavailable, true},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
