@@ -109,8 +109,9 @@ realised by the stack:
     and what it did is on the record. They are the layout operations (createBoard, addServer,
     setNodeCount, applyReplan, removeServer), completeRemoval, the settings writes
     (`writeSetting`, which configuration's `set` and `setWithin` reach, and `initWithin`),
-    cluster's login operations, and applyChanges and
-    resetSecret, which run only under the administrator credential. Any server login may
+    cluster's login operations, and applyChanges,
+    createBoard and resetSecret, which run only under the administrator credential, a
+    precondition the database checks and not only the gate. Any server login may
     call the others, except createLogin, disableLogin and revokeLogin, which the database
     grants to no server login (only their containing operations reach them): a server holding a login can therefore run a registry operation directly, past
     the access-control gate, which is the trust the brief grants a server login; the gate

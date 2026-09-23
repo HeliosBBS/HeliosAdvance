@@ -25,7 +25,7 @@ Provided, **database-access v1**, to every subsystem and program:
 | openWith | the setup tool only, at first run, at an upgrade and for a secret reset: address, transport, trust anchor, and the administrator credential, never stored or logged | a connection under that credential, subject to the same transport decision | Fatal (as `open`), Invalid (transport invalid for the address), Unavailable |
 | transaction | the work to do; a deadline (the operation deadline unless the caller states another) | the work's result | Unavailable, Conflict, and whatever the work reports |
 | now | inside a transaction | the database clock | |
-| lockBoard | inside a transaction | the cluster mutex, held until the transaction ends | Unavailable |
+| lockBoard | inside a transaction | the cluster mutex, held until the transaction ends | NotFound (no board row yet), Unavailable |
 | seal | a value | the sealed form | none in a running process (the key was checked at `open`) |
 | unseal | a sealed form | the value | Invalid (not sealed under this key, or tampered) |
 | reachable | none | whether the last operation succeeded | |
