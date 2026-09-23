@@ -6,6 +6,9 @@ GitHub App. Reads loop.local.json beside this script (gitignored):
 Run attended first:  .\loop.ps1 -Once
 Stop a running or scheduled loop:  New-Item <base>\state\stop-requested
 On a usage limit the loop schedules itself for the reset time as a Windows scheduled task.
+Every session run appends one JSON line to <base>\state\token-usage.jsonl (tokens, cost,
+per-model split, peak context, subagent census, limit utilisation), so a cost question is
+one pipeline:  Get-Content <base>\state\token-usage.jsonl | ConvertFrom-Json | Measure-Object cost -Sum
 #>
 param(
     [string]$Repo = "HeliosAdvance",
@@ -27,6 +30,7 @@ $wikiDir = Join-Path $base "$Repo.wiki"
 $stateDir = Join-Path $base "state" $Repo
 $stopFile = Join-Path $base "state" "stop-requested"
 $loopStateFile = Join-Path $base "state" "loop.json"
+$usageFile = Join-Path $base "state" "token-usage.jsonl"
 $tiers = @("haiku", "sonnet", "opus")
 $null = New-Item -ItemType Directory -Force $base, $stateDir
 
@@ -143,7 +147,10 @@ function Get-ResetDateTime([string]$text) {
     $parsed
 }
 
-function Get-RetryTime([string]$text) {
+function Get-RetryTime([string]$text, $rateLimit) {
+    if ($rateLimit -and (Get-Field $rateLimit resetsAt)) {
+        return [DateTimeOffset]::FromUnixTimeSeconds([int64]$rateLimit.resetsAt).LocalDateTime.AddMinutes(2)
+    }
     $at = Get-ResetDateTime $text
     if ($at) { return $at.AddMinutes(2) }
     $now = Get-Date
@@ -198,25 +205,125 @@ $notes
 "@
 }
 
-function Invoke-Session([string]$dir, [string]$prompt, [string]$model, [string]$logPath) {
-    $env:WORK_IDENTITY = $identity
-    Push-Location $dir
-    try {
-        & claude -p $prompt --model $model --effort high --dangerously-skip-permissions --output-format text 2>&1 |
-            Tee-Object -FilePath $logPath
-    }
-    finally { Pop-Location }
+# Strict mode throws on a property the CLI's JSON did not send; absent reads as null.
+function Get-Field($object, [string]$name) {
+    if ($null -ne $object -and $object.PSObject.Properties[$name]) { $object.$name } else { $null }
 }
 
-function Get-Marker([string[]]$lines) {
-    $text = $lines -join "`n"
-    if ($text -match '(?im)(reached|hit)\s.*\blimit\b|usage limit|rate limit') { return @("PAUSE", $text) }
-    for ($i = $lines.Count - 1; $i -ge 0; $i--) {
-        $line = $lines[$i].Trim()
-        if ($line -match '^LOOP:\s*(DONE|ROUTE-UP|HUMAN)\b\s*(.*)$') { return @($Matches[1], $Matches[2]) }
-        if ($line) { break }
+# stream-json rather than text: the log keeps every message with its own usage, and the
+# result line carries the session ID, token counts, cost and per-model usage. Peak context
+# is the largest prompt any assistant message paid for, which is what tells a bloated
+# context from a long task when a run costs more than expected.
+function Invoke-Session([string]$dir, [string]$prompt, [string]$model, [string]$logPath) {
+    $env:WORK_IDENTITY = $identity
+    $started = Get-Date
+    Push-Location $dir
+    try {
+        $lines = @(& claude -p $prompt --model $model --effort high --dangerously-skip-permissions --output-format stream-json --verbose 2>&1 |
+            ForEach-Object { "$_" } | Tee-Object -FilePath $logPath)
     }
+    finally { Pop-Location }
+    $session = Read-Stream $lines
+    $session.Seconds = [int]((Get-Date) - $started).TotalSeconds
+    $script:lastRateLimit = $session.RateLimit
+    $session
+}
+
+function Read-Stream([string[]]$lines) {
+    $session = @{ Result = $null; Text = ($lines -join "`n"); Raw = ($lines -join "`n"); PeakContext = [int64]0; RateLimit = $null; Seconds = 0 }
+    foreach ($line in $lines) {
+        if (-not $line.StartsWith("{")) { continue }
+        try { $message = $line | ConvertFrom-Json } catch { continue }
+        switch (Get-Field $message type) {
+            "assistant" {
+                $usage = Get-Field (Get-Field $message message) usage
+                $context = [int64](Get-Field $usage input_tokens) + [int64](Get-Field $usage cache_read_input_tokens) + [int64](Get-Field $usage cache_creation_input_tokens)
+                if ($context -gt $session.PeakContext) { $session.PeakContext = $context }
+            }
+            "rate_limit_event" { $session.RateLimit = Get-Field $message rate_limit_info }
+            "result" {
+                $session.Result = $message
+                if (Get-Field $message result) { $session.Text = $message.result }
+            }
+        }
+    }
+    $session
+}
+
+# Which model actually served each subagent, from the assistant messages' own model field:
+# a pinned dispatch can be served by another model and nothing else records it. Only that
+# field counts, because a transcript quotes model names in prompts and tool output too.
+# Counts are transcripts per model, found by session ID under whichever project directory
+# holds it.
+function Get-SubagentModels([string]$sessionId) {
+    $models = @{}
+    if (-not $sessionId) { return $models }
+    $root = Get-ChildItem (Join-Path $env:USERPROFILE ".claude\projects") -Directory -Depth 1 -Filter $sessionId -ErrorAction SilentlyContinue | Select-Object -First 1
+    if (-not $root) { return $models }
+    foreach ($file in Get-ChildItem $root.FullName -Recurse -Filter 'agent-*.jsonl') {
+        $seen = @{}
+        foreach ($line in Get-Content $file.FullName) {
+            if (-not $line.StartsWith('{"') -or $line -notmatch '"type":"assistant"') { continue }
+            try { $message = $line | ConvertFrom-Json } catch { continue }
+            if ((Get-Field $message type) -ne "assistant") { continue }
+            $name = Get-Field (Get-Field $message message) model
+            if ($name) { $seen[$name] = $true }
+        }
+        foreach ($name in $seen.Keys) { $models[$name] = 1 + $(if ($models.ContainsKey($name)) { $models[$name] } else { 0 }) }
+    }
+    $models
+}
+
+# One JSON line per session run, every repository in one file. Each run is its own
+# session, so a line is a complete figure: summing lines never double-counts.
+function Write-Usage([int]$number, [int]$iteration, [string]$tier, [string]$model, [string]$outcome, $session, [string]$logPath) {
+    $result = $session.Result
+    $usage = Get-Field $result usage
+    $models = [ordered]@{}
+    $modelUsage = Get-Field $result modelUsage
+    if ($modelUsage) {
+        foreach ($p in $modelUsage.PSObject.Properties | Sort-Object Name) {
+            $models[$p.Name] = [ordered]@{ in = [int64](Get-Field $p.Value inputTokens); cache_write = [int64](Get-Field $p.Value cacheCreationInputTokens)
+                                           cache_read = [int64](Get-Field $p.Value cacheReadInputTokens); out = [int64](Get-Field $p.Value outputTokens)
+                                           cost = [math]::Round([double](Get-Field $p.Value costUSD), 4) }
+        }
+    }
+    $sessionId = [string](Get-Field $result session_id)
+    $windows = Get-Field $session.RateLimit unifiedWindows
+    $record = [ordered]@{
+        at = (Get-Date).ToString('s'); repo = $Repo; issue = $number; iteration = $iteration
+        tier = $tier; model = $model; outcome = $outcome; seconds = $session.Seconds
+        session_id = $sessionId; turns = [int](Get-Field $result num_turns)
+        in = [int64](Get-Field $usage input_tokens); cache_write = [int64](Get-Field $usage cache_creation_input_tokens)
+        cache_read = [int64](Get-Field $usage cache_read_input_tokens); out = [int64](Get-Field $usage output_tokens)
+        thinking = [int64](Get-Field (Get-Field $usage output_tokens_details) thinking_tokens)
+        peak_context = $session.PeakContext; cost = [math]::Round([double](Get-Field $result total_cost_usd), 4)
+        models = $models
+        subagents_spawned = [int](Get-Field (Get-Field $result subagent_stats) spawned)
+        subagent_models = Get-SubagentModels $sessionId
+        five_hour = [double](Get-Field (Get-Field $windows five_hour) utilization)
+        seven_day = [double](Get-Field (Get-Field $windows seven_day) utilization)
+        log = $logPath
+    }
+    try { ($record | ConvertTo-Json -Compress -Depth 4) | Add-Content $usageFile } catch { Log "usage record not written: $($_.Exception.Message)" }
+    Log ("#{0}: {1} on {2}: {3} turns, {4}s, in={5} cache_read={6} out={7} peak={8}k cost=`${9} 5h={10}% 7d={11}%" -f $number, $outcome, $model,
+        $record.turns, $record.seconds, ($record.in + $record.cache_write), $record.cache_read, $record.out, [int]($record.peak_context / 1000), $record.cost,
+        [int]($record.five_hour * 100), [int]($record.seven_day * 100))
+}
+
+function Get-Marker([string]$text) {
+    if ($text -match '(?im)(reached|hit)\s.*\blimit\b|usage limit|rate limit') { return @("PAUSE", $text) }
+    $lines = @($text -split "`n" | Where-Object { $_.Trim() })
+    if ($lines.Count -gt 0 -and $lines[-1].Trim() -match '^LOOP:\s*(DONE|ROUTE-UP|HUMAN)\b\s*(.*)$') { return @($Matches[1], $Matches[2]) }
     @("NONE", "")
+}
+
+# One session, its marker, and its usage record.
+function Invoke-Task([int]$number, [int]$iteration, [string]$worktree, $issue, [string]$learnings, [string]$notes, [string]$tier, [string]$model, [string]$logPath) {
+    $session = Invoke-Session $worktree (Build-Prompt $issue $learnings $notes) $model $logPath
+    $marker, $detail = Get-Marker $session.Text
+    Write-Usage $number $iteration $tier $model $marker $session $logPath
+    @($session, $marker, $detail)
 }
 
 function Invoke-Iteration([int]$iteration) {
@@ -265,36 +372,36 @@ function Invoke-Iteration([int]$iteration) {
     $learnings = Get-Content (Join-Path $wikiDir "Learnings.md") -Raw
     $ticksBefore = ([regex]::Matches($issue.body, '- \[x\]')).Count
     Log "#${number}: running on $tier"
-    $output = Invoke-Session $worktree (Build-Prompt $issue $learnings $state.notes) $tier $log
-    $marker, $detail = Get-Marker @($output)
+    $session, $marker, $detail = Invoke-Task $number $state.iterations $worktree $issue $learnings $state.notes $tier $tier $log
 
     if ($marker -eq "ROUTE-UP") {
         $up = Next-Tier $tier
         if ($up) {
             Log "#${number}: routing up to $up"
             $state.notes = $detail
-            $output = Invoke-Session $worktree (Build-Prompt $issue $learnings $state.notes) $up "$log.escalated"
-            $marker, $detail = Get-Marker @($output)
+            $session, $marker, $detail = Invoke-Task $number $state.iterations $worktree $issue $learnings $state.notes $tier $up "$log.escalated"
         }
         if ($marker -eq "ROUTE-UP") { $marker = "HUMAN"; $detail = "failed after routing up: $detail" }
     }
 
+    $lastLines = ($session.Text -split "`n" | Select-Object -Last 40) -join "`n"
     if ($marker -eq "PAUSE") {
-        $state.notes = ($output | Select-Object -Last 40) -join "`n"
+        $state.notes = $lastLines
         Write-State $number $state
         return "pause:" + $detail
     }
 
     # The gutter detector: the same failing test, or the same files churned with no box ticked,
-    # three iterations running; or a placeholder that passes.
-    $failing = @([regex]::Matches(($output -join "`n"), '--- FAIL: (\S+)') | ForEach-Object { $_.Groups[1].Value } | Sort-Object -Unique)
+    # three iterations running; or a placeholder that passes. Test names are read from the
+    # raw stream, where tool output is JSON-escaped, so the name stops at a backslash.
+    $failing = @([regex]::Matches($session.Raw, '--- FAIL: ([^\s\\"]+)') | ForEach-Object { $_.Groups[1].Value } | Sort-Object -Unique)
     $changed = @(& git.exe -C $worktree diff --name-only origin/development | Sort-Object)
     Push-Location $repoDir; & work refresh 2>&1 | Out-Null; Pop-Location
     $after = Get-Content (Join-Path $repoDir "issues.jsonl") | ForEach-Object { $_ | ConvertFrom-Json } | Where-Object number -eq $number
     $ticked = $after -and ([regex]::Matches($after.body, '- \[x\]')).Count -gt $ticksBefore
     $state.failingTests = @($state.failingTests + , $failing | Select-Object -Last 3)
     $state.changedFiles = @($state.changedFiles + , $changed | Select-Object -Last 3)
-    if ($ticked) { $state.ticks++; $state.notes = "" } else { $state.notes = ($output | Select-Object -Last 40) -join "`n" }
+    if ($ticked) { $state.ticks++; $state.notes = "" } else { $state.notes = $lastLines }
     $sameTest = $failing.Count -gt 0 -and $state.failingTests.Count -eq 3 -and (@($state.failingTests | ForEach-Object { $_ -join "," } | Sort-Object -Unique).Count -eq 1)
     $sameFiles = -not $ticked -and $changed.Count -gt 0 -and $state.changedFiles.Count -eq 3 -and (@($state.changedFiles | ForEach-Object { $_ -join "," } | Sort-Object -Unique).Count -eq 1)
     $placeholder = (& git.exe -C $worktree diff origin/development) -match 'TODO|not implemented'
@@ -317,6 +424,7 @@ function Invoke-Iteration([int]$iteration) {
 # ---- main ----
 if (Test-Path $stopFile) { Remove-RetryTask; Log "stop requested ($stopFile); not running"; exit 0 }
 Remove-RetryTask
+$script:lastRateLimit = $null
 $loopState = Read-LoopState
 try {
     $env:GH_TOKEN = New-InstallationToken
@@ -336,7 +444,7 @@ try {
         Write-LoopState $loopState
         if ($result -eq "empty") { Log "nothing to do"; break }
         if ($result.StartsWith("pause:")) {
-            $at = Get-RetryTime $result.Substring(6)
+            $at = Get-RetryTime $result.Substring(6) $script:lastRateLimit
             Log "usage limit reached; state written"
             Set-RetryTask $at
             Write-Output ($result.Substring(6) -split "`n" | Where-Object { $_ -match '(?i)limit' } | Select-Object -First 1)
