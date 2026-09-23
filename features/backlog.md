@@ -31,7 +31,8 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
 ## Callers
 
 - **Telnet caller**: a caller connects over Telnet to a node and reaches the theme's welcome;
-  option negotiation; connection limits, per-source throttling, idle timeouts. Depends on:
+  option negotiation; connection limits, per-source throttling, idle timeouts. Default port
+  TCP/23, default binding all addresses, both changeable in `hadv-config`. Depends on:
   servers, scripting layer, theme packs. Touches the load tester.
 - **Accounts and login**: sign-up, login, sessions across servers, lockouts; a second factor
   when the account's role requires it. A user may set themselves private and then does not
@@ -53,15 +54,20 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   who's-online by default. Depends on: accounts and login.
 - **Second factor**: TOTP; passkeys where the surface allows; required per role; the initial
   #1 Sysop enrols during first-run setup. Depends on: accounts, RBAC. Touches the Portal.
-- **Telnet over TLS caller**: the Telnet experience over a TLS-wrapped listener. Depends on:
+- **Telnet over TLS caller**: the Telnet experience over a TLS-wrapped listener. Default port
+  TCP/992, default binding all addresses, both changeable in `hadv-config`. Depends on:
   certificates, Telnet caller.
-- **SSH caller**: the same over SSH, host keys from certificates, option negotiation.
-  Depends on: certificates, Telnet caller. Touches the load tester and the SIP gateway.
+- **SSH caller**: the same over SSH, host keys from certificates, option negotiation. Default
+  port TCP/22, default binding all addresses, both changeable in `hadv-config`. Depends on:
+  certificates, Telnet caller. Touches the load tester and the SIP gateway.
 - **SSH public-key login**: a user uploads a public key (on the web, or by file transfer on a
   classic connection) and logs in with it; a required second factor still applies. Depends
   on: SSH caller, accounts, second factor, file transfer.
 - **Web caller**: a browser reaches the board over HTTP, HTTPS and HTTP/3 and gets the
-  selected theme's web side. Depends on: scripting layer, theme packs, certificates.
+  selected theme's web side. Default ports TCP/80 (HTTP), TCP/443 (HTTPS), UDP/443 (QUIC);
+  HTTP redirects to HTTPS by default; default binding all addresses; ports, binding and the
+  redirect all changeable in `hadv-config`. Depends on: scripting layer, theme packs,
+  certificates.
 - **Terminal-in-browser rendering**: the classic theme's terminal experience rendered in the
   browser: ANSI to HTML with animation and ANSI music. Depends on: web caller.
 - **Modern theme**: rich HTML on the web and a lightbar ANSI system on the terminal; shipped;
@@ -80,7 +86,8 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
 ## Operating the board
 
 - **Admin API**: what the configuration, console, user-editor and strings tools use; nothing
-  but the engine touches the database. Depends on: RBAC.
+  but the engine touches the database. Default ports TCP/8443 (HTTPS) and UDP/8443 (QUIC),
+  default binding all addresses, changeable in `hadv-config`. Depends on: RBAC.
 - **Public API**: the board's HTTP interface for clients, with its OpenAPI description.
   Depends on: web caller, accounts, RBAC. Touches the Portal and the load tester.
 - **Waiting-for-Caller console**: `hadv-console` and `hadv-console-gui`: who is on which node
