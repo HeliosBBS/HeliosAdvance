@@ -40,3 +40,15 @@ func TestClassOf(t *testing.T) {
 		})
 	}
 }
+
+func TestErrorsIsWithSentinels(t *testing.T) {
+	t.Parallel()
+
+	wrapped := fmt.Errorf("operation failed: %w", Unavailable)
+	if !errors.Is(wrapped, Unavailable) {
+		t.Errorf("errors.Is(fmt.Errorf with Unavailable, Unavailable) = false, want true")
+	}
+	if errors.Is(wrapped, Conflict) {
+		t.Errorf("errors.Is(fmt.Errorf with Unavailable, Conflict) = true, want false")
+	}
+}
