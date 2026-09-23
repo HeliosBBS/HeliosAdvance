@@ -223,7 +223,9 @@ function Invoke-Session([string]$dir, [string]$prompt, [string]$model, [string]$
     $started = Get-Date
     Push-Location $dir
     try {
-        $lines = @(& claude -p $prompt --model $model --effort $effort --dangerously-skip-permissions --output-format stream-json --verbose 2>&1 |
+        # The prompt goes in on stdin: it carries the whole issue body, and a Windows
+        # command line is capped near 32 KB.
+        $lines = @($prompt | & claude -p --model $model --effort $effort --dangerously-skip-permissions --output-format stream-json --verbose 2>&1 |
             ForEach-Object { "$_" } | Tee-Object -FilePath $logPath)
     }
     finally { Pop-Location }
