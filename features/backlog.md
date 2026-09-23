@@ -58,8 +58,11 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   TCP/992, default binding all addresses, both changeable in `hadv-config`. Depends on:
   certificates, Telnet caller.
 - **SSH caller**: the same over SSH, host keys from certificates, option negotiation. Default
-  port TCP/22, default binding all addresses, both changeable in `hadv-config`. Depends on:
-  certificates, Telnet caller. Touches the load tester and the SIP gateway.
+  port TCP/22, default binding all addresses, both changeable in `hadv-config`. The sysop
+  guide must explain that on a Linux host the system's own SSH service usually holds TCP/22,
+  and how to move that service to another port (or the board's SSH to another port) so the
+  two do not conflict. Depends on: certificates, Telnet caller. Touches the load tester and
+  the SIP gateway.
 - **SSH public-key login**: a user uploads a public key (on the web, or by file transfer on a
   classic connection) and logs in with it; a required second factor still applies. Depends
   on: SSH caller, accounts, second factor, file transfer.
