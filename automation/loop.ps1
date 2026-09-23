@@ -374,6 +374,12 @@ rules: home-grown first (the standard library before a hand-written mechanism), 
 abstractions, no rule the specification does not state, comments only where the reader learns something the code cannot
 say, readable names.
 
+Stage 3, simplification. Name the smaller shape that meets the same task: a standard-library call in place of a
+hand-written mechanism, a type or a file that need not exist, a branch that cannot run, lines that restate the
+specification instead of implementing it. A simplification is a finding only when it keeps every check: a validation at
+a trust boundary, a permission gate, an audit entry, a negative-path test, a deadline, an error check, a fail-closed
+branch and a transaction boundary stay whatever they cost, and a change that removes one is itself a finding.
+
 Report every finding as a numbered line: the file, what is wrong, the fix you expect. Say nothing about what is fine.
 A rule the specification does not state is not a finding: do not ask for a precedence, a default or a policy the
 documents never give, unless the code cannot be correct without one, in which case name the sentence that needs it. The
