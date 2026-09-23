@@ -136,7 +136,7 @@ hold is the cluster mutex.
 |---|---|
 | server ID | increasing identifier, the key; never reused because rows are never deleted |
 | display name | 1 to 32 code points (fixed backstop), no control characters |
-| normalised name | NFC of the default case folding of the NFD of the display name (the Unicode Standard, version 15.1); set while active, empty when removed; a uniqueness constraint where set makes names unique among active servers |
+| normalised name | NFC of the default case folding of the NFD of the display name, under the Unicode version the database implements; set while active, empty when removed; a uniqueness constraint where set makes names unique among active servers |
 | status | `active`, `removing` (removed, revocation pending), or `removed`; `removed` is terminal |
 | lease generation | increased at each acquisition |
 | lease expires at | database clock, or empty |
@@ -547,3 +547,4 @@ architecture's negative tests describe.
 
 ## Revision history
 - 2026-09-23: created for ADV-001.
+- 2026-09-23: the normalised name folds under the database's Unicode version, not a fixed one.

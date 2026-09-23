@@ -22,8 +22,9 @@ same if this file changed; this file says how each property they state is realis
 
 ## The database
 
-**PostgreSQL** (a current major release; the minimum supported version is recorded here when
-the first release is cut) is the board's single database. How the specifications' database
+**PostgreSQL 18 or later** is the board's single database: 18 is the floor because the
+normalised display name needs the database's Unicode case folding, which arrived in 18. The
+development compose file and CI run the current 18 image. How the specifications' database
 properties map onto it:
 
 | Property in the specs | Realisation |
@@ -41,6 +42,7 @@ properties map onto it:
 | a server login | a PostgreSQL role per server, with row-level security policies that bind its direct writes to its own server row and the node rows it owns, and grants that reach nothing else |
 | a database-side operation | a `SECURITY DEFINER` function owned by the schema-owning role, granted to the server roles, checking its preconditions before it writes |
 | the administrator credential | the schema-owning role's credential, held by no program; `hadv-setup` prompts for it at first run and at an upgrade |
+| the normalised display name | `normalize(casefold(normalize(name, NFD)), NFC)` inside the layout operation, so the database's own Unicode tables apply |
 
 Schema changes are numbered, transactional, additive-only migrations that ship with the
 engine and are applied by `hadv-setup` under the schema owner at first run and at an
