@@ -5,7 +5,8 @@ Serves: ADV-001
 Serves: ADV-001
 The record of every state-changing operator action, written by one operation inside the
 action's own transaction so that no action succeeds without its entry, and read by one
-operation for the sysop.
+operation for the sysop. It decides nothing about what is audited or what a value means;
+the owning subsystems do.
 
 ## Terms
 Serves: ADV-001
@@ -47,10 +48,12 @@ Serves: ADV-001
 | Input | Outcome |
 |---|---|
 | `record` inside a transaction that commits | one entry |
-| `record` inside a transaction that fails or times out | no entry; the action did not happen |
+| `record` inside a transaction that fails | no entry; the action did not happen |
+| `record` inside a transaction that times out | Unavailable; the action and its entry either both exist or neither does |
+| `record` while the connection is lost | Unavailable, as above |
 | the same action retried after an Unavailable | a new action, a new entry |
 | two actions concurrently, on this or another server | two entries; entry IDs order them |
-| `list` with a cursor | entries with IDs below the cursor |
+| `list` with a cursor | entries with IDs below the cursor; paging is exact for entries committed before the first page was read, and an entry committed later with a lower ID than the cursor is seen only by a fresh listing |
 | `list` with a page size outside its bounds | Invalid |
 
 ## Failure directions
@@ -72,7 +75,8 @@ None: the audit log does not audit itself.
 Serves: ADV-001
 | Key | Default | Kind | Scope | Apply | Exposed by |
 |---|---|---|---|---|---|
-| page size | 100; at most 1,000 | fixed policy backstop | fixed | | not exposed |
+| page size default | 100 | calibration target | fixed | n/a | not exposed |
+| page size maximum | 1,000 | fixed policy backstop | fixed | n/a | not exposed |
 
 ## Security considerations
 Serves: ADV-001
@@ -86,9 +90,10 @@ Serves: ADV-001
 - An action whose `record` is forced to fail → the action is rolled back; nothing changed.
 - `list` with access control forced to error → Denied.
 - `list` by an actor without the permission → Denied.
-- An update or delete of an entry attempted with a server login → rejected by the database.
+- An update or delete of an entry attempted with a server login, or with a login created
+  through join v1 → rejected by the database.
 - `list` with page size 0 or 1,001 → Invalid.
-- Two pages with the cursor → no entry repeated or skipped.
+- Two pages with the cursor, with no writer between them → no entry repeated or skipped.
 
 ## Revision history
 - 2026-09-23: created for ADV-001.

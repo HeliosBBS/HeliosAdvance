@@ -6,13 +6,15 @@ Serves: ADV-001
 One board on many servers: what a server is, how it proves it is alive, how node numbers are
 laid out across servers and taken by callers, what every server sees of every other, and
 what a server does when it cannot reach the database. Membership, liveness and capacity are
-one consistency domain, so they have one owner.
+one consistency domain, so they have one owner. It is not the caller surfaces, not session
+handling, and not the tools: it gives them contracts.
 
 ## Terms
 Serves: ADV-001
-As the glossary defines them: lease, generation, layout, high-water mark, re-plan, occupancy
-(and the occupancy rule), screen boundary, local lease deadline, reconcile, trusted proxy
-list, management listener, public listener.
+As the glossary defines them: lease, generation, layout, layout position, high-water mark,
+re-plan, occupancy rule, screen boundary, local lease deadline, reconcile, trusted proxy
+list, management listener, public listener, node handle, caller reference, applied change,
+data-model change.
 
 ## Contracts
 Serves: ADV-001
@@ -25,89 +27,101 @@ Provided:
 | admitting | none | whether the server accepts callers (true only in Serving) | none |
 | freeNodesCached | none | free nodes on this server as of the last read-back, or `unknown` before the first | none |
 | callersOnlineCached | none | callers online across the board as of the last read-back, or `unknown`; for a theme's pre-login display | none |
-| claim | a session identifier from sessions v1, the caller reference, the surface | a node handle: node number, the session identifier | Refused (not admitting, or the lease is not live), Exhausted (no free node; a Refused with that reason), Unavailable |
+| claim | a session identifier from sessions v1, the caller reference, the surface | a node handle | Refused (not admitting, or the lease is not live), Exhausted (no free node; a Refused with that reason), Unavailable |
 | handle.checkpoint | at every screen boundary | `continue`, or `end` with the message to show | none |
 | handle.release | none; idempotent | none | Unavailable (queued; retried after every successful renewal) |
+| releaseSession | a session identifier | none; idempotent; matches on the identifier alone | Unavailable (queued as above) |
 
 The surface's obligations: call `admitting` on accept and, if false, show the theme's
 "not accepting callers" screen and close; consult `freeNodesCached` on accept and, if it is
 zero (not `unknown`), show the busy screen and close without a database read; call `claim`
-at login and on Exhausted show the busy screen and close; on Unavailable from `claim` show the
-"not accepting callers" screen, close, and call `release` with the same session identifier so
-a claim that committed without a reply is cleared; call `checkpoint` at every screen
-boundary; call `release` when the session ends for any reason, as sessions v1 defines a
-session's end for each surface.
+at login and on Exhausted show the busy screen and close; on Unavailable from `claim` show
+the "not accepting callers" screen, close, and call `releaseSession` with the same identifier
+so a claim that committed without a reply is cleared; call `checkpoint` at every screen
+boundary; call `release` when the session ends, as sessions v1 defines a session's end for
+each surface. Per-account limits on concurrent sessions are sessions v1's and are applied
+before a claim is attempted.
 
 **cluster.whosOnline v1**, to menus and tools: `list(viewer)` → rows of node number, server
 ID, server display name, caller display name (resolved through sessions v1 from the caller
-reference), surface, claimed at; ordered by node number; read from the database on every
-call. Gate: `whos_online.view` through access-control v1; error means Denied. The viewer is
-an input so that later filters can attach to it.
+reference; a node whose name cannot be resolved is listed without one), surface, claimed at;
+ordered by node number; read from the database on every call. Gate: `whos_online.view`
+through access-control v1. Errors: Denied, Unavailable (the menu shows "who's online is not
+available"). The viewer is an input of the contract.
 
-**cluster.registry v1**, to the setup tool, the runtime configuration tools and join v1.
-Every operation takes an actor and is gated through access-control v1 as the table says;
-each writes its audit entry in its own transaction and fails with it.
+**cluster.registry v1**, to the setup tool, the runtime configuration tools and join v1. Each
+state-changing operation is gated through access-control v1 as its row says and writes its
+audit entry in its own transaction, failing with it; the read operations are gated and write
+nothing.
 
 | Operation | Gate | Inputs | Outputs | Errors |
 |---|---|---|---|---|
-| createBoard | the local operator, only while no board row exists (first run) | board name, display name, node count, HTTP connection limit | server ID, range | Denied, Invalid, Refused (a board exists), Unavailable |
-| addServer | `board.administer`, on behalf of join v1 | display name, node count, HTTP connection limit | server ID, range | Denied, Invalid, Conflict (name taken), Refused (node numbers exhausted), Unavailable |
-| listServers | `board.administer` | none | per server: ID, name, status, lease live, engine version, host facts, transport and address (as stored at admission), range, nodes in use, HTTP in use and limit, restart needed, record differs from running | Denied, Unavailable |
+| createBoard | `board.create`; the setup tool runs it with the database administrator's credential, which the local operator supplies once and which is never stored or logged | board name, first server's display name, node count, transport and address for the record, the key-encryption key identifier | server ID, range, the first server's login and secret (returned once, to be written into the record) | Denied, Invalid, Refused (a board exists whose first server has acquired a lease), Unavailable |
+| addServer | `board.administer`, on behalf of join v1 | display name, node count, transport and address the new record will hold | server ID, range | Denied, Invalid, Conflict (name taken), Refused (node numbers exhausted), Unavailable |
+| listServers | `board.administer` | none | per server: ID, name, status, lease live, engine version, host facts, transport and address as stored at last admission, range, nodes in use, HTTP in use and limit, restart needed | Denied, Unavailable |
 | setNodeCount | `board.administer` | server, count, expected layout version | range | Denied, Invalid, NotFound, Conflict (layout changed), Refused (nodes in use; re-plan needed; node numbers exhausted), Unavailable |
 | previewReplan | `board.administer` | none | proposed ranges, affected nodes, the occupied ones among them, layout version | Denied, Unavailable |
 | applyReplan | `board.administer` | expected layout version | ranges | Denied, Conflict, Refused (nodes in use), Unavailable |
-| removeServer | `board.administer` | server, the server ID typed again | none | Denied, Invalid (mismatch), NotFound, Refused (already removed; the last active server; the login could not be revoked), Unavailable |
-| markStarted | the engine itself | the settings version of its first snapshot | none | Unavailable |
+| removeServer | `board.administer` | server, the server ID typed again | none | Denied, Invalid (mismatch), NotFound, Refused (already removed; the last active server; the server whose login carries this operation), Unavailable |
+| markStarted | none: not an operator action; the engine calls it once per process | the settings version of the first snapshot | none | Unavailable |
 
-Starting and stopping a server are the host's service manager's operations, run by the local
-operator directly or through the setup tool; no board operation stops a server.
+createBoard is idempotent for recovery: a board whose first server has never acquired a
+lease is returned again (same ID, a fresh secret) rather than Refused, so a first run whose
+record write failed can be re-run. Starting and stopping a server are the host's service
+manager's operations, run by the local operator directly or through the setup tool; no board
+operation stops a server.
 
-**cluster.health v1**, external, over HTTP, body encoded as JSON (a public standard):
+**cluster.health v1**, external, over HTTP/1.1 (RFC 9112), body encoded as JSON (RFC 8259):
 `GET /health` on the management listener returns the detailed form when the connection's own
 peer address is inside an entry of the trusted proxy list, else the minimal form; the same
-path on the public listener returns the minimal form always. No forwarded-address header is
-consulted; no database is read.
+path on the public listener returns the minimal form always. Only the peer address is used
+(http v1 reports nothing else); no database is read.
 
 | Form | Body | HTTP status |
 |---|---|---|
-| minimal | `status`: `up` or `down` | 200 for `up`; 503 for `down` |
-| detailed | `status`: `up`, `full` or `down`; `server_id`; `engine_version`; `lease_live`; `nodes_in_use`, `node_count`, `free_nodes`; `http_in_use`, `http_limit`; `as_of_seconds` | 200 for `up` and `full`; 503 for `down` |
+| minimal | `status` (string): `up` or `down` | 200 for `up`; 503 for `down` |
+| detailed | `status` (string): `up`, `full` or `down`; `server_id` (integer); `engine_version` (string); `lease_live` (boolean); `nodes_in_use`, `node_count`, `free_nodes` (integers, absent before the first read-back); `http_in_use`, `http_limit` (integers, the public listener); `as_of_seconds` (integer, absent before the first read-back) | 200 for `up` and `full`; 503 for `down` |
 
-`status` is `up` in Serving with a free node, `full` in Serving with none (minimal form says
-`up`), `down` in every other state. `lease_live` is true in Serving, in Degraded before the
-local lease deadline, and in Draining. The node counts are as of the last read-back
-(acquisition or renewal) and `as_of_seconds` is the server's own clock since it; before the
-first read-back they are absent. The HTTP counts are live from http v1.
+`status` is `up` in Serving with a free node, `full` in Serving with none (the minimal form
+says `up`), `down` in every other state. `lease_live` is true in Serving, in Degraded before
+the local lease deadline, and in Draining. Counts are as of the last read-back (acquisition
+or renewal); `as_of_seconds` is the server's own clock since it.
 
-Consumed: database-access v1; access-control v1; configuration v1; audit v1; http v1;
-sessions v1 (session identifiers, session end per surface, caller display names); theme v1
-(the busy and "not accepting callers" screens; when it fails, a fixed built-in line "All
-nodes are busy. Please call again later." or "This server is not accepting callers." is shown
-and the connection still ends); join v1 (creating and revoking a server's database login).
+Consumed: database-access v1; access-control v1; configuration v1 (`read` inside acquisition,
+`setWithin` inside createBoard and addServer, `get` for the trusted proxy list and the
+timeout); audit v1; http v1; sessions v1; theme v1 (the busy and "not accepting callers"
+screens; when it fails, a fixed built-in line "All nodes are busy. Please call again later."
+or "This server is not accepting callers." is shown and the connection still ends); join v1
+(creating a server's database login at createBoard and addServer, disabling and revoking it
+at removal).
 
 ## Data model
 Serves: ADV-001
-**Board**, exactly one row; its exclusive hold is the cluster mutex.
+**Board**, exactly one row, enforced by a uniqueness constraint on a fixed key; its exclusive
+hold is the cluster mutex.
 
 | Field | Meaning |
 |---|---|
+| key | the one fixed value |
 | name | the board's name |
 | minimum engine version | major and minor; the oldest engine version the data model admits (see Behaviour, version rule) |
 | layout version | increased by every layout change |
 | high-water mark | the highest node number ever assigned; 0 on an empty board |
-| next layout position | handed to a server at its first range assignment |
+| next layout position | the board's counter, taken under the mutex at a server's first range assignment; the only source of layout positions |
 
-**Server**, never deleted; the row lease renewal writes, which no layout operation holds.
+**Server**, never deleted; the row lease renewal writes.
 
 | Field | Meaning |
 |---|---|
 | server ID | increasing identifier, the key; never reused because rows are never deleted |
-| display name | 1 to 32 code points (fixed backstop), no control characters, unique among active servers after normalisation to canonical composed form and default case folding as the Unicode Standard defines them |
-| status | `active` or `removed`; `removed` is terminal |
+| display name | 1 to 32 code points (fixed backstop), no control characters |
+| normalised name | the display name in Unicode canonical composed form with default case folding (the Unicode Standard, version 15.1); set while active, empty when removed; a uniqueness constraint where set makes names unique among active servers |
+| status | `active`, `removing` (removed, revocation pending), or `removed`; `removed` is terminal |
 | lease generation | increased at each acquisition |
 | lease expires at | database clock, or empty |
 | lease timeout used | the timeout written at the last renewal |
-| engine version, operating system, processor architecture, transport, database address | informational, written at acquisition; never branch behaviour |
+| engine version, operating system, processor architecture | informational, written at acquisition; never branch behaviour |
+| transport, database address, trust-anchor fingerprint, login name | as the record held them at the last admission, or as createBoard and addServer stored them; compared at acquisition |
 | started settings version | written once per process by `markStarted` |
 | HTTP in use reported, reported at | written by each renewal, for the tools |
 | removed at, removed by | set once |
@@ -120,9 +134,9 @@ operations hold.
 | server ID | the key |
 | node count | 0 up to the node-number backstop |
 | range start, range end | empty when the count is 0; end − start + 1 = count |
-| layout position | unique; the order re-plan packs in; assigned at the first range assignment |
+| layout position | unique; the order re-plan packs in; empty until the first range assignment; a server that grows from count 0 after a shrink keeps its position |
 
-**Node**, one row per assigned node number.
+**Node**, one row per assigned node number; a shrink deletes the rows it drops.
 
 | Field | Meaning |
 |---|---|
@@ -139,26 +153,32 @@ is set, so one session identifier occupies at most one node.
 **Applied change**, one row per data-model change applied to the database: change ID
 (increasing identifier), the engine version that shipped it, applied at.
 
-Check-then-act operations, each one transaction taking holds in the global order:
+Check-then-act operations, each one transaction taking holds in the global order (board,
+settings state, server rows by ID, layout rows by server ID, setting rows, node rows by
+number):
 
 1. **Acquire lease** (Admitting, and every renewal interval in Fenced): exclusive hold on the
-   own server row; succeed only if active and the lease is empty or expired; read the lease
-   timeout setting (the default if unset) and the layout row; increase the generation; write
-   expiry = now + timeout, the informational fields; clear the
+   own server row; succeed only if active and the lease is empty or expired; compare the
+   record's transport, address, trust-anchor fingerprint and login name (from `recordFields`)
+   with the stored values, and if any differs write `server.record.change` (actor: the local
+   operator of this server; before and after) before overwriting them; read the lease timeout
+   through configuration v1 `read` (the default if unset); read the own layout row; increase
+   the generation; write expiry = now + timeout and the informational fields; clear the
    occupant fields of every own node row, in ascending order; read back what renewal reads
-   back. A live lease held by anyone makes it Conflict. If the record's transport or address
-   differs from the server row's stored values, write the audit entry `server.record.change`
-   (actor: the local operator of this server; before and after) in the same transaction; if
-   that write fails, the acquisition fails.
+   back. A live lease held by anyone makes it Conflict. If the audit write fails, the
+   acquisition fails.
 2. **Renew lease** (every renewal interval in Serving, Degraded and Draining): compare-and-set
    on the own server row matching own ID, own generation, active, and expiry later than now;
-   write expiry = now + timeout, the reported HTTP fields. In the same transaction read back:
-   the minimum engine version, the settings version, own status, own count and range from
-   the layout row, own occupied count under the occupancy rule, and the board's occupied
-   count. When no rows matched, read back own status all the same. A Conflict from contention is retried within the interval; Unavailable at the
-   deadline is the "database Unavailable" input. Renewal never waits on a layout operation,
-   because it holds only the server row and reads the layout row without holding it. The
-   operation is bound to the bootstrap record's identity; it cannot name another server.
+   write expiry = now + timeout and the reported HTTP fields (the public listener). In the same
+   transaction read back: the minimum engine version, the settings version, own status, own
+   count and range from the layout row, own occupied count under the occupancy rule, the
+   board's occupied count, and the lowest engine version among other active servers with
+   live leases. When no rows matched, read back own status all the same. A Conflict from
+   contention is retried within the interval; Unavailable at the deadline is the "database
+   Unavailable" input. Renewal never waits on a layout operation: it holds only the server
+   row and reads the layout row without holding it. The operation is bound to the bootstrap
+   record's identity; it cannot name another server. After every successful renewal the
+   process retries its queued releases and runs reconcile.
 3. **Claim node**: shared hold on the own server row to confirm the lease is live at the own
    generation (else Refused, and the process takes the "renewal matches nothing" input);
    choose the lowest own node number that is free under the occupancy rule; compare-and-set
@@ -167,36 +187,43 @@ Check-then-act operations, each one transaction taking holds in the global order
    server's node count, Exhausted. A claim waits on a row a layout operation holds, bounded by
    the operation deadline. The claim names no node number, so a claim outside the own range
    cannot be expressed, and the predicate refuses any row another server owns.
-4. **Release node**: compare-and-set clearing the occupant fields where the node number and
-   the session identifier match; zero rows is success.
+4. **Release**: compare-and-set clearing the occupant fields where the session identifier
+   matches (and, for a handle, the node number too); zero rows is success.
 5. **Layout operations** (createBoard, addServer, setNodeCount, applyReplan, removeServer):
-   the cluster mutex; then the layout rows involved in ascending server ID; then the affected
-   node rows in ascending number; never a server row. Each re-reads state after taking the
-   mutex, checks occupancy under the rule on the affected rows, clears the occupant fields of
-   every node row whose owner changes, increases the layout version, and records its audit
-   entry. setNodeCount and applyReplan compare the expected layout version and fail with
-   Conflict if it moved.
-6. **Drain** (a host stop): compare-and-set on the own server row matching own ID and own
-   generation: expiry = now; then clear own node rows whose claim generation is the own
-   generation; record the audit entry `server.stop` (actor: the local operator of this server).
-   Zero rows on the first step means a successor holds the lease; do nothing further.
-7. **Remove server**: operation 5, plus: Refused if it is the last active server; status
-   `removed`, the node rows deleted, the lease cleared, and the server's database login
-   revoked through join v1 inside the same transaction, which ends that login's open
-   connections; if the revocation fails, the removal fails.
+   the cluster mutex; then, for createBoard, addServer and removeServer, the server row
+   created or removed; then the layout rows involved in ascending server ID; then the
+   affected node rows in ascending number; never the server row of a server that keeps
+   running. Each re-reads state after taking the mutex, clears the occupant fields of every
+   node row whose owner changes, increases the layout version, and records its audit entry.
+   setNodeCount and applyReplan refuse when an affected node is occupied and compare the
+   expected layout version, failing with Conflict if it moved; removeServer records the
+   occupied nodes and does not refuse on them. createBoard also creates the settings state
+   row, and createBoard and addServer write the new server's `http.connection_limit` through
+   configuration v1 `setWithin` in the same transaction (one `setting.change` entry).
+6. **Drain** (a host stop, and any Fatal while a lease is held and the database is
+   reachable): compare-and-set on the own server row matching own ID and own generation:
+   expiry = now; then clear own node rows whose claim generation is the own generation;
+   record `server.stop` (actor: the local operator of this server). Zero rows on the first
+   step means a successor holds the lease; do nothing further.
+7. **Remove server**, in two steps. First, operation 5 with: Refused if the target is the last
+   active server, or is the server whose login carries this transaction; status `removing`;
+   the node rows deleted; the lease cleared; the normalised name cleared; the login disabled
+   through join v1 in the same transaction; the audit entry. Second, after commit, the
+   login's open connections are ended and the login revoked through join v1, and status
+   becomes `removed`; any server whose renewal finds a server in `removing` retries this step
+   until it succeeds. `listServers` shows `removing` until it is done.
 
 Layout rules:
 
 - **Create board / add**: range start = high-water mark + 1; the mark advances to the new
   range end; the layout position comes from the board's counter. Refused with "node numbers
   exhausted" if the new end would exceed the node-number backstop.
-- **Set node count, shrink**: drop the tail of the own range; the dropped numbers are the
-  affected nodes; the mark does not move; the freed numbers are not reassigned until a
-  re-plan.
-- **Set node count, grow**: only if the range's end equals the high-water mark (no number
-  above it has ever been assigned) or the count is 0 (an add-style assignment, with a new
-  layout position); then extend in place and advance the mark. Otherwise Refused with
-  "re-plan needed": a range is never moved except by a re-plan.
+- **Set node count, shrink**: drop the tail of the own range and delete the dropped node rows;
+  the range start and the position are kept; the mark does not move; the freed numbers are
+  not reassigned until a re-plan.
+- **Set node count, grow**: only if the range's end equals the high-water mark, or the count
+  is 0 (an add-style assignment keeping the position); then extend in place and advance the
+  mark. Otherwise Refused with "re-plan needed": a range is never moved except by a re-plan.
 - **Re-plan**: pack every active server's range from node 1 upward in layout-position order
   with its configured count; the mark becomes the last assigned number. A node number is
   affected if its owner differs before and after or it ceases to exist; refused, listing the
@@ -206,15 +233,17 @@ Layout rules:
 
 ## Behaviour
 Serves: ADV-001
-**Version rule.** The board's minimum engine version is raised only by a data-model change
-that older engines cannot use, and such a change may raise it to at most one minor version
-below the engine that ships it. A server is admitted when its version is at least the
-minimum and at most one minor version above it, on the same major version. Upgrading one
-server to the next minor version admits it and leaves every other server admitted; a server
-two minors ahead is refused until the board has moved; a server below the minimum is refused
-and told the version required; a running server that finds the minimum raised above its
-window drains. Data-model changes run after the version check, by an admitted server, under
-the cluster mutex, each recorded as an applied change and never applied twice.
+**Version rule.** Versions are ordered by major then minor; a server's version is "one step
+above" another's when it is the next minor of the same major or the first minor of the next
+major. A server is admitted when its version is at least the board's minimum engine version
+and at most one step above the lowest version among the other active servers holding live
+leases (with no other such server, any version at or above the minimum is admitted). A
+data-model change that older engines cannot use raises the minimum to at most the lowest
+version among active servers with live leases at the moment it runs; a server whose version
+is below the minimum is refused and told the version required; a running server that finds
+the minimum raised above its version drains. Data-model changes run after the version check,
+by an admitted server, under the cluster mutex, each recorded as an applied change and never
+applied twice. Rolling upgrades therefore walk the board forward one step at a time.
 
 **Process states**, after database-access has opened the connection:
 
@@ -226,22 +255,24 @@ the cluster mutex, each recorded as an applied change and never applied twice.
 | Fenced | no | the local lease deadline passed or the lease was found lost; every session has been ended; acquisition is attempted each renewal interval |
 | Draining | no | ordered to stop; sessions end at their next screen boundary, bounded by one lease timeout |
 | Stopped | no | terminal; exits with the code the service manager does not restart |
-| Refused | no | terminal; exits with the code the service manager does not restart, naming the reason; database-access's Fatal maps here |
+| Refused | no | terminal; exits with the code the service manager does not restart, naming the reason; any Fatal (database-access, http, configuration) maps here, draining first (operation 6) when a lease is held and the database is reachable |
 
 A crash exits with any other code, which the service manager restarts.
 
 **Host stop**: the host's service manager asks the process to stop, directly or through the
-setup tool. No board operation stops a server; the drain that follows records the stop.
+setup tool. No board operation stops a server; the drain records the stop.
 
-| State \ input | renewal or acquisition succeeds | renewal matches nothing | database Unavailable | Conflict on renewal | host stop | removed (read back) | minimum raised above window | duplicate process |
-|---|---|---|---|---|---|---|---|---|
-| Admitting | own status `removed` → Refused; version outside window → Refused; acquired → Serving | n/a | stay; retry each renewal interval | retry now | Stopped | Refused | Refused | a live lease held by another → wait one renewal interval and retry; still held after one lease timeout plus one renewal interval → Refused ("already running elsewhere") |
-| Serving | refresh settings if the version moved; update cached counts; stay | end every session now; if the read-back says removed → Stopped; else → Fenced | → Degraded | retry within the interval; at the deadline treat as Unavailable | → Draining | end every session now → Stopped | → Draining | cannot acquire or renew; never disturbs this one |
-| Degraded | reconcile; → Serving | as Serving | at the local lease deadline: end every remaining session → Fenced; else keep retrying | as Serving | → Draining | as Serving | → Draining | as Serving |
-| Fenced | acquisition succeeded → refresh settings, update counts → Serving (listeners stay open) | acquisition finds status `removed` → Refused | keep retrying each renewal interval | retry now | Stopped | Refused | Refused | acquisition finds a live lease → keep retrying; after the wait above → Refused |
-| Draining | every session ended, or one lease timeout elapsed → drain (operation 6) → Stopped | end every session now → Stopped | at the local deadline end every session → Stopped without writing | retry within the interval | ignored | end every session now → Stopped | continue draining | as Serving |
+| State \ input | renewal or acquisition succeeds | renewal matches nothing | database Unavailable | Conflict on renewal or acquisition | host stop | own status found not active | minimum raised above own version | duplicate process with this identity | invalid: a Fatal from any subsystem | concurrent from another session on this server (an operator action) |
+|---|---|---|---|---|---|---|---|---|---|---|
+| Admitting | own status not active → Refused; version outside window → Refused; acquired → Serving | n/a | stay; retry each renewal interval | a live lease held → wait one renewal interval and retry; still held after the duplicate-process wait → Refused ("already running elsewhere") | Stopped | Refused | Refused | as Conflict | Refused | none possible before admission |
+| Serving | refresh settings if the version moved; update cached counts; stay | end every session now → Fenced | → Degraded | retry within the interval; at the deadline treat as Unavailable | → Draining | end every session now → Stopped | → Draining | cannot acquire or renew; never disturbs this one | → Draining then Refused | a setting, count or layout change: applied at the next renewal's read-back |
+| Degraded | reconcile; → Serving | as Serving | at the local lease deadline: end every remaining session → Fenced; else keep retrying | as Serving | → Draining | as Serving | → Draining | as Serving | → Refused (no drain possible) | observed on recovery |
+| Fenced | → refresh settings, update counts → Serving (listeners stay open) | n/a | keep retrying each renewal interval | acquisition finds a live lease → keep retrying; after the wait → Refused | Stopped | Refused | Refused | as Conflict | Refused | observed on re-acquisition |
+| Draining | every session ended, or one lease timeout elapsed → drain (operation 6) → Stopped | end every session now → Stopped | at the local deadline end every session → Stopped without writing | retry within the interval | ignored | end every session now → Stopped | continue draining | as Serving | → Stopped without writing | observed at the next renewal |
 
 Renewal keeps running in Serving, Degraded and Draining; acquisition is attempted in Fenced.
+A removed server never reads its status: its login is disabled, so its next connection is
+rejected and it reaches Refused through database-access's Fatal.
 
 **Suspend**: a server whose clock shows a gap longer than the lease timeout since its last
 successful renewal or acquisition treats its lease as lost at its next checkpoint or renewal
@@ -252,16 +283,27 @@ while it slept.
 message; a session waiting for input ends at the local lease deadline if no input arrives
 first; a web session ends at its next request or at its end as sessions v1 defines it.
 
-**Node states** under the occupancy rule: unassigned (no row) → free (a layout operation
-creates it) → occupied (claim) → free (release; the owner's lease expiry, at once, everywhere;
-the owner removed, row deleted; the owner changed by a layout operation, occupant cleared).
-A stale row (occupant set but free under the rule) is cleared by its owner's next acquisition
-and overwritten by its owner's next claim.
+**Node states**, under the occupancy rule:
 
-**Reconcile** (on Degraded → Serving) and **after every successful renewal**: clear the
-occupant fields of every own node row whose session identifier is not in this process's live
-handles, with the predicate "owned by this server, that session identifier, this
-generation"; retry every queued release. A second run finds nothing to do.
+| State | Input | Transition |
+|---|---|---|
+| unassigned (no row) | a layout operation assigns it | → free |
+| free | a claim by its owner's session | → occupied |
+| free | a claim from another server | impossible: the predicate refuses it |
+| free | a layout operation removes or reassigns it | → unassigned, or free under the new owner |
+| occupied | release with the matching session | → free |
+| occupied | release with another session | unchanged; zero rows |
+| occupied | the owner's lease expires | → free at once, everywhere |
+| occupied | the owner is removed | row deleted |
+| occupied | a layout operation would move it | the operation is refused (setNodeCount, applyReplan) |
+| occupied | the owner's next acquisition | → free (occupant cleared) |
+| stale (occupant set, free under the rule) | the owner's next acquisition or claim | cleared or overwritten |
+| any | a claim that times out after committing | the surface's `releaseSession` clears it at the next renewal |
+
+**Reconcile** (on Degraded → Serving, and after every successful renewal): clear the occupant
+fields of every own node row whose session identifier is not in this process's live handles,
+with the predicate "owned by this server, that session identifier, this generation"; retry
+every queued release. A second run finds nothing to do.
 
 ## Failure directions
 Serves: ADV-001
@@ -274,8 +316,8 @@ Serves: ADV-001
 | trusted proxy list | unparseable at `set` | Invalid; a stored list that cannot be parsed is treated as empty |
 | theme screens | missing or fail | the built-in line; the connection still ends |
 | audit | fails | the operator action, or the acquisition writing `server.record.change`, rolls back |
-| join v1 | revocation fails | the removal is Refused |
-| sessions v1 | fails to resolve a display name | who's-online shows the node with no name rather than failing |
+| join v1 | disabling the login fails | the removal is Refused; revoking fails after commit → retried at every server's renewal until it succeeds |
+| sessions v1 | cannot resolve a display name | the node is listed without one |
 | own clock | a gap longer than the timeout | the lease is treated as lost |
 
 ## Multi-node invariants
@@ -287,14 +329,15 @@ deadline; the cached counts.
 
 | Cache | Invalidation |
 |---|---|
-| own count, range, occupied count, free count, board callers online | replaced by every read-back (acquisition and renewal); `unknown` before the first; `as_of_seconds` exposes the age |
+| own count, range, occupied count, free count, board callers online, lowest other version | replaced by every read-back (acquisition and renewal); `unknown` before the first; `as_of_seconds` exposes the age |
 | the minimum engine version | replaced by every read-back |
 | who's-online | none: read on every call |
 
 Jobs: renewal and acquisition (a compare-and-set or a guarded acquire; a duplicate tick
-extends to the same or a later time, or finds the lease live); reconcile (clears to the same
-empty state); data-model changes (recorded, never applied twice). There is no reaper: an
-expired server's nodes are free under the occupancy rule at the instant of expiry.
+extends to the same or a later time, or finds the lease live); reconcile and queued releases
+(clear to the same empty state); pending revocations (a second server finds the login already
+revoked); data-model changes (recorded, never applied twice). There is no reaper: an expired
+server's nodes are free under the occupancy rule at the instant of expiry.
 
 ## Audit
 Serves: ADV-001
@@ -302,55 +345,55 @@ Serves: ADV-001
 |---|---|---|---|
 | `board.create` | createBoard | empty | board name, first server's name, count, range, HTTP limit |
 | `server.add` | addServer | empty | name, count, range, HTTP limit |
-| `server.remove` | removeServer | name, `active`, range, occupied node numbers | `removed` |
+| `server.remove` | removeServer, first step | name, `active`, range, occupied node numbers | `removing` |
 | `server.node_count.change` | setNodeCount | count, range | count, range |
 | `layout.replan` | applyReplan that changes anything | every active range | every active range |
-| `server.stop` | the drain that follows a host stop | lease state | drained |
-| `server.record.change` | acquisition finding the record's transport or address changed | transport, address | transport, address |
+| `server.stop` | the drain that follows a host stop or a Fatal | lease state | drained |
+| `server.record.change` | acquisition finding the record's transport, address, trust-anchor fingerprint or login name changed | those fields | those fields |
 
-The HTTP connection limit is a setting (`http.connection_limit`) and its change is audited by
-configuration as `setting.change`. Refused operations change nothing and write no entry.
+The HTTP connection limit is a setting and its changes are audited by configuration as
+`setting.change`. Refused operations change nothing and write no entry.
 
 ## Configuration
 Serves: ADV-001
 | Key | Default | Kind | Scope | Apply | Exposed by |
 |---|---|---|---|---|---|
-| node count (a Layout field, changed only by setNodeCount) | set at join | sysop tunable; 0 up to the node-number backstop | server | live | runtime configuration tools; setup tool at first run and join |
+| `cluster.node_count` (held on the Layout row; changed only by setNodeCount) | 4 | sysop tunable; 0 up to the node-number backstop | server | live | runtime configuration tools; setup tool at first run and join |
 | `cluster.lease_timeout_renewals` | 3 | sysop tunable; 2 to 10 (fixed backstops: below 2 one late write drops a healthy server, above 10 a dead server's callers stay listed too long) | board | live at the next renewal | runtime configuration tools |
-| `cluster.trusted_proxies` | empty | sysop tunable; a list of address ranges in prefix notation, no names; IPv4 addresses arriving as IPv6-mapped are compared as IPv4 | board | live | runtime configuration tools |
-| lease renewal interval | five seconds | calibration target | fixed | | not exposed |
-| node-number backstop | 2,147,483,647 | fixed policy backstop | | | not exposed |
-| draining bound | one lease timeout | fixed policy backstop | | | not exposed |
-| version skew window | one minor version above the minimum, same major | fixed policy backstop | | | not exposed |
-| duplicate-process wait | one lease timeout plus one renewal interval | calibration target | fixed | | not exposed |
+| `cluster.trusted_proxies` | empty | sysop tunable; a list of address ranges in prefix notation (RFC 4632 for IPv4, RFC 4291 for IPv6), no names; an IPv4 peer arriving as an IPv4-mapped IPv6 address (RFC 4291 section 2.5.5.2) is compared as IPv4 | board | live | runtime configuration tools |
+| lease renewal interval | five seconds | calibration target | fixed | n/a | not exposed |
+| node-number backstop | 2,147,483,647 | fixed policy backstop | fixed | n/a | not exposed |
+| draining bound | one lease timeout | fixed policy backstop | fixed | n/a | not exposed |
+| version skew window | one step above the lowest other active server | fixed policy backstop | fixed | n/a | not exposed |
+| duplicate-process wait | one lease timeout plus one renewal interval | calibration target | fixed | n/a | not exposed |
 
-Tool screens: Servers (listServers, restart-needed and record-differs flags); Server detail
-(count with the resulting range or refusal, HTTP limit, transport and address as reported,
-remove with typed confirmation); Layout (previewReplan; apply disabled while any
-affected node is occupied, listing them); Board (lease timeout in renewals with the
-resulting seconds, trusted proxy list). In the setup tool, for its own server only: the
-bootstrap record's address, trust anchor and transport, the listen addresses, stop and
-start; the setup tool restarts the engine after writing the record.
+Tool screens: Servers (listServers, restart-needed flags); Server detail (count with the
+resulting range or refusal, HTTP limit, transport and address as stored, remove with typed
+confirmation); Layout (previewReplan; apply disabled while any affected node is occupied,
+listing them); Board (lease timeout in renewals with the resulting seconds, trusted proxy
+list). In the setup tool, for its own server only: the bootstrap record (address, trust
+anchor, transport, login and secret), the listen addresses, stop and start.
 
 ## Security considerations
 Serves: ADV-001
 | Surface | Attacker | Abuse | Decision | Fails closed |
 |---|---|---|---|---|
 | node claims and leases | a misconfigured or lying server, or a duplicate process | exhaust numbers, evict another server's callers, keep a lease it should not | ranges assigned only by layout operations under the mutex, from configured counts, bounded by the backstop; a claim names no number and its predicate refuses rows another server owns; renewal and drain are compare-and-sets on own identity and generation; a duplicate cannot acquire a live lease | out-of-range or stale-generation claim Refused; zero-row renewal ends sessions; zero-row drain does nothing |
-| listeners | an anonymous flooder | take every node | nodes are taken only at login; a connection while the cached free count is zero is turned away without a database read; per-source limits are the caller features' | at the limit, refuse |
-| health | an anonymous mapper | learn fullness and timing | detail only on the management listener from a peer inside the trusted proxy list; the public listener says up or down; no forwarded header; no database read | empty or unparseable list means minimal |
+| listeners | an anonymous flooder | take every node | nodes are taken only at login; a connection while the cached free count is zero is turned away without a database read; per-account concurrent sessions are bounded by sessions v1 before a claim; per-source limits are the surfaces' own | at the limit, refuse |
+| health | an anonymous mapper | learn fullness and timing | detail only on the management listener from a peer inside the trusted proxy list; the public listener says up or down; only the peer address is consulted; no database read | empty or unparseable list means minimal |
 | who's-online | an anonymous caller | count per-server fullness | gated on `whos_online.view` | Denied on any error |
-| registry | a caller without the permission | change the board | every operation gated through access-control v1 | error means Denied |
-| removal | whoever holds a removed server's disk | act as a server | removal revokes the login and ends its connections in the same transaction; the last active server cannot be removed | revocation failure refuses the removal |
+| registry | a caller without the permission | change the board | every state-changing operation gated through access-control v1 | error means Denied |
+| first run | anyone who can run the setup tool against an empty database | create a board and its first login | `board.create` for the local operator; the administrator credential is supplied once and never stored or logged; a board whose first server has acquired a lease cannot be created again; the board row's fixed key makes two concurrent first runs one Conflict | Refused or Conflict |
+| removal | whoever holds a removed server's disk | act as a server, or open sealed values with the key-encryption key still on that disk | removal disables the login in the transaction and revokes it after; the key on the disk is an accepted residual risk, answered by the key rotation the sysop guide documents for a compromised server | revocation failure refuses the removal; a pending revocation is retried by every server |
 | lease timing | anyone who can delay database writes | drop a healthy server's callers, or leave ghosts | timeout in renewals, bounded 2 to 10, on the database clock; the local deadline never falls after the database's; a suspended host treats its lease as lost; expired nodes are free at once; queued releases retried every renewal | expired means gone |
-| a re-plan or count change | a slow layout operation | stall every server's renewal | layout operations hold layout and node rows only, never the server row renewal writes | renewal never waits on layout |
+| a re-plan or count change | a slow layout operation | stall every server's renewal | layout operations hold layout and node rows, and only the server row of a server being created or removed | renewal never waits on layout |
 
 ## Negative tests
 Serves: ADV-001
-The gate tests cover each registry operation by name (createBoard, addServer, listServers,
-setNodeCount, previewReplan, applyReplan, removeServer) and whosOnline.list.
-Database failures and clock movement are injected through the harness property the
-architecture states.
+The gate tests cover each state-changing registry operation by name (createBoard, addServer,
+setNodeCount, applyReplan, removeServer) and the reads (listServers, previewReplan) and
+whosOnline.list. Database failures and clock movement are injected through the harness the
+architecture's negative tests describe.
 
 1. Re-plan with a caller on an affected node → Refused listing exactly the occupied affected nodes; no row changed; no audit entry.
 2. Shrink that would drop an occupied node → Refused listing it; range unchanged.
@@ -366,40 +409,43 @@ architecture states.
 12. Unauthenticated web requests in any number → no occupied row.
 13. Two logins race for the last free node → one succeeds, the other is Exhausted.
 14. Claim at a generation older than the server's current → Refused; nothing written.
-15. A claim's compare-and-set issued (through the harness) against a row another server owns → matches nothing; the row unchanged.
+15. A claim's compare-and-set issued through the harness against a row another server owns → matches nothing; the row unchanged.
 16. Renewal at a stale generation → zero rows; the process ends every session and goes Fenced.
 17. Server A's writes delayed past the timeout → A ends every session no later than the database expiry; who's-online on B stops listing A's callers at expiry; A's nodes count as free on B at expiry.
-18. A outage longer than the lease timeout, then the database returns → A acquires with a new generation without operator action; its old occupant fields are cleared; callers can log in again.
+18. An outage longer than the lease timeout, then the database returns → A acquires with a new generation without operator action; its old occupant fields are cleared; callers can log in again.
 19. Database unreachable from a Serving server → new logins refused; each session ends at its next screen boundary; an idle session ends at the local deadline; health is 503 `down`.
 20. Database restored before the local deadline → Serving again with no operator action; reconcile clears only rows whose sessions are gone.
-21. A claim that times out after committing, on a server that never leaves Serving → the surface's release is retried after the next renewal and clears the row; no ghost.
-22. A long re-plan (held past the renewal interval through the harness) → no server's renewal stalls; no server goes Degraded.
+21. A claim that times out after committing, on a server that never leaves Serving → `releaseSession` is retried after the next renewal and clears the row; no ghost.
+22. A long re-plan held past the renewal interval through the harness → no server's renewal stalls; no server goes Degraded.
 23. Engine below the minimum → Refused naming the required version.
-24. Engine two minors above the minimum, or another major → Refused naming the window.
-25. A data-model change shipped by version N+1 sets the minimum to N → servers on N keep serving; a server on N−1 drains and stops; the change is recorded once and not applied by a second server.
-26. A second process with the same identity while the first renews → Refused as already running; the first's lease and sessions untouched.
-27. Drain from a stale process while a successor holds the lease → zero rows; the successor's lease and occupied nodes untouched.
-28. Remove a server → its sessions end within one renewal interval; its rows are gone; an already-open connection of its login fails its next statement; restarting it → Refused as removed; a later add never receives its ID.
-29. Remove with the revocation forced to fail → Refused; the server still active.
-30. Remove the last active server → Refused.
-31. Remove an already removed server → Refused; one audit entry only.
-32. Remove with a mismatched confirmation → Invalid; nothing changed.
-33. Each registry operation with access control forced to error → Denied; nothing changed; no audit entry.
-34. Each registry operation by an actor without the permission → Denied.
-35. Each registry operation with audit forced to fail → rolled back.
-36. Health on the public listener → minimal only, from any peer.
-37. Health on the management listener from a peer outside the list → minimal; inside → detailed; empty list → minimal; a forwarded-address header naming a trusted address → minimal; a stored list made unparseable outside `set` → minimal to a peer that was in it.
-38. Health with the database unreachable → served from cache, 503 `down`, no query; before the first read-back the count fields are absent.
-39. whosOnline.list by a viewer not logged in → Denied.
-40. A board-wide setting changed on A → applied on B within one renewal interval; a restart-mode setting → both tools list the servers needing a restart.
-41. `cluster.lease_timeout_renewals` set to 1 or 11 → Invalid.
-42. `cluster.trusted_proxies` with a name or an unparseable entry → Invalid; stored list unchanged.
-43. A clock gap longer than the timeout (injected) → the lease treated as lost at the next checkpoint.
-44. Release twice for one session → both succeed; the node is free once.
-45. A host stop → the server drains, `server.stop` is audited by the drain with the local operator as actor, and the process exits with the no-restart code; a host stop with the database unreachable → the drain writes nothing, the process exits at the local deadline.
-46. createBoard when a board exists → Refused; createBoard by a local operator on first run → the board row, the first server, its login and range exist, `board.create` audited.
-47. The setup tool changes the record's transport, then the engine restarts → `server.record.change` is written at acquisition with the old and new transport; with audit forced to fail, the acquisition fails.
-48. Conflict from contention on renewal (injected) → retried within the interval; no session ends.
+24. Engine two steps above the lowest other active server → Refused naming the window; one step above → admitted.
+25. A data-model change shipped by version N+1, with the lowest active server on N → the minimum becomes at most N; servers on N keep serving; a server that then starts on N−1 is refused; the change is recorded once and not applied by a second server.
+26. A lone server on N restarts as N+2 → admitted (no other active server).
+27. A second process with the same identity while the first renews → Refused as already running; the first's lease and sessions untouched.
+28. Drain from a stale process while a successor holds the lease → zero rows; the successor's lease and occupied nodes untouched.
+29. Remove a server → its sessions end within one renewal interval; its rows are gone; its login is disabled in the transaction; an already-open connection of its login fails its next statement once the second step runs; its next connection is rejected and it reaches Refused; a later add never receives its ID.
+30. Remove with disabling the login forced to fail → Refused; the server still active. Remove with the second step's revocation forced to fail → status `removing`; another server's renewal completes it once the fault is lifted.
+31. Remove the last active server → Refused. Remove the server whose login carries the operation → Refused.
+32. Remove an already removed server → Refused; one audit entry only.
+33. Remove with a mismatched confirmation → Invalid; nothing changed.
+34. Each state-changing registry operation with access control forced to error → Denied; nothing changed; no audit entry.
+35. Each registry operation by an actor without the permission → Denied.
+36. Each state-changing registry operation with audit forced to fail → rolled back.
+37. Health on the public listener → minimal only, from any peer.
+38. Health on the management listener from a peer outside the list → minimal; inside → detailed; empty list → minimal; a forwarded-address header naming a trusted address → minimal; a stored list made unparseable outside `set` → minimal to a peer that was in it.
+39. Health with the database unreachable → served from cache, 503 `down`, no query; before the first read-back the count fields are absent.
+40. whosOnline.list by a viewer not logged in → Denied; with the database unreachable → Unavailable.
+41. A board-wide setting changed on A → applied on B within one renewal interval; a restart-mode setting → both tools list the servers needing a restart.
+42. `cluster.lease_timeout_renewals` set to 1 or 11 → Invalid.
+43. `cluster.trusted_proxies` with a name or an unparseable entry → Invalid; stored list unchanged.
+44. A clock gap longer than the timeout (injected) → the lease treated as lost at the next checkpoint.
+45. Release twice for one session → both succeed; the node is free once.
+46. A host stop → the server drains, `server.stop` is audited with the local operator as actor, and the process exits with the no-restart code; a host stop with the database unreachable → the drain writes nothing, the process exits at the local deadline.
+47. createBoard when a board exists whose first server has acquired a lease → Refused; when its first server never acquired → the same server ID and a fresh secret; two concurrent first runs against an empty database → one succeeds, one Conflict.
+48. The setup tool changes the record's trust anchor, then the engine restarts → `server.record.change` is written at acquisition with the old and new fingerprint; with audit forced to fail, the acquisition fails; a first acquisition after createBoard or addServer with an unchanged record writes nothing.
+49. Conflict from contention on renewal (injected) → retried within the interval; no session ends.
+50. Two servers named "Alpha" and "alpha" → the second addServer is Conflict.
+51. A listener bind failure after the lease is held → the process drains (`server.stop` audited) and exits with the no-restart code.
 
 ## Revision history
 - 2026-09-23: created for ADV-001.

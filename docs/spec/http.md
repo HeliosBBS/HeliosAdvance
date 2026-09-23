@@ -6,7 +6,8 @@ Serves: ADV-001
 Each server's HTTP listeners: the public listener that callers reach, and the management
 listener that serves detailed health to a proxy. The per-server connection limits and the
 deadlines that keep a slow client from holding a connection are properties of a listener,
-whatever route a request reaches, so they live here.
+whatever route a request reaches, so they live here. It serves no route of its own and
+decides nothing about what a route may reveal.
 
 ## Terms
 Serves: ADV-001
@@ -45,6 +46,7 @@ For each listener:
 | Connection open | idle for the idle deadline | close; count − 1 |
 | Connection open | client closes | count − 1 |
 | Listening | limit lowered below the count | no new accepts until the count is below the new limit |
+| Connection open | the same client opens a second connection | counted separately; no per-client rule here |
 | Starting | a listener's address cannot be bound | the process stops (Fatal), naming the address |
 
 ## Failure directions
@@ -67,18 +69,16 @@ None here; the keys below are audited by configuration as setting changes.
 Serves: ADV-001
 | Key | Default | Kind | Scope | Apply | Exposed by |
 |---|---|---|---|---|---|
-| `http.public_listen` | every address of the host, port 80 | sysop tunable; connectivity setting | server | restart | setup tool, runtime configuration tools |
-| `http.management_listen` | the loopback address, port 8443 | sysop tunable; connectivity setting | server | restart | setup tool, runtime configuration tools |
-| `http.connection_limit` | set at join; at least 1, at most 65,535 (fixed backstops) | sysop tunable | server | live | runtime configuration tools |
-| management connection limit | 64 | fixed policy backstop | fixed | | not exposed |
-| header deadline | ten seconds | calibration target | fixed | | not exposed |
-| body deadline, per write without progress | sixty seconds | calibration target | fixed | | not exposed |
-| write deadline, per write without progress | sixty seconds | calibration target | fixed | | not exposed |
-| idle deadline | sixty seconds | calibration target | fixed | | not exposed |
+| `http.public_listen` | every address of the host, port 80 | sysop tunable; connectivity setting; an address literal or the wildcard address, and a port from 1 to 65,535 | server | restart | setup tool, runtime configuration tools |
+| `http.management_listen` | the loopback address, port 8443 | sysop tunable; connectivity setting; the same validation | server | restart | setup tool, runtime configuration tools |
+| `http.connection_limit` | 256 | sysop tunable; at least 1, at most 65,535 (fixed backstops); written at first run and join through configuration v1 `setWithin` | server | live | runtime configuration tools |
+| management connection limit | 64 | fixed policy backstop | fixed | n/a | not exposed |
+| header deadline | ten seconds | calibration target | fixed | n/a | not exposed |
+| body deadline, per write without progress | sixty seconds | calibration target | fixed | n/a | not exposed |
+| write deadline, per write without progress | sixty seconds | calibration target | fixed | n/a | not exposed |
+| idle deadline | sixty seconds | calibration target | fixed | n/a | not exposed |
 
-Both listeners carry no credential and serve nothing that needs one; the only routes mounted
-in this corpus are cluster's health routes. Transport security for the public listener is a
-property of the web caller feature's contract, published in the contracts register.
+Neither listener carries a credential or serves anything that needs one.
 
 ## Security considerations
 Serves: ADV-001

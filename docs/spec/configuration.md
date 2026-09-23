@@ -6,7 +6,8 @@ Serves: ADV-001
 The settings model every feature with a sysop setting uses: a setting has a key, a kind, a
 scope, a default, validation, an apply mode, and a value in the database; a change is
 recorded, audited and applied on every server; the tools that show and change settings work
-from one registry rather than knowing each key.
+from one registry rather than knowing each key. It is not the owner of any setting's
+meaning: each subsystem declares its keys and reads its own values.
 
 ## Terms
 Serves: ADV-001
@@ -18,19 +19,24 @@ Provided, **configuration v1**:
 
 | Operation | Inputs | Outputs | Errors |
 |---|---|---|---|
-| declare | at start-up only: key, kind, scope (`board` or `server`), default, validation rule, apply mode (`live` or `restart`), secret (yes or no), connectivity setting (yes or no) | none | Invalid (duplicate key: a start-up defect; the process stops with Fatal) |
+| declare | at start-up only: key, kind, scope (`board` or `server`), default, validation rule, apply mode (`live` or `restart`), secret (yes or no), connectivity setting (yes or no; allowed only with scope `server`) | none | Invalid (duplicate key, or a board-scoped connectivity setting: a start-up defect; the process stops with Fatal) |
 | get | key; for a server-scoped key this server is implied | the value from the snapshot, or the default when none is stored | none |
 | set | actor, key, target server (for a server-scoped key), value | the value stored | Denied, Invalid, NotFound, Conflict, Unavailable |
 | restartNeeded | server | the restart-mode keys, board-scoped or scoped to that server, changed since that server's process loaded its first snapshot | Unavailable |
 | refresh | the settings version reported by the last lease renewal | none | Unavailable |
-| markStarted | none; called once by the engine after its first snapshot load | none | Unavailable |
+| read | inside a caller's transaction: key, target server | the stored value, or the default when none is stored | NotFound |
+| setWithin | inside a caller's transaction: actor, key, target server, value | the value stored; the caller's transaction carries the audit entry | Invalid, NotFound |
+| list | actor, target server | every declared key with its kind, scope, apply mode, default and the stored value for that target (a secret value withheld) | Denied, Unavailable |
 
-Gate for `set`, through access-control v1: `board.administer`; or `server.connectivity` for
-the target server when the key is a connectivity setting. Any error from the check is Denied.
+Gate for `set` and `list`, through access-control v1: `board.administer`; or
+`server.connectivity` for the target server when the key is a connectivity setting (`list`
+then shows only that server's connectivity settings). Any error from the check is Denied.
+`read` and `setWithin` run inside another subsystem's transaction and are gated by that
+subsystem's operation. The engine calls cluster.registry v1 `markStarted` once after its
+first snapshot load.
 
-Consumed: access-control v1; audit v1 (every `set` records `setting.change`); database-access
-v1 (transactions, `seal` and `open` for secret values); cluster.registry v1 (`markStarted`
-writes the server's started settings version through it).
+Consumed: access-control v1; audit v1 (every `set` and `setWithin` records
+`setting.change`); database-access v1 (transactions, `seal` and `unseal` for secret values).
 
 ## Data model
 Serves: ADV-001
@@ -50,15 +56,15 @@ so that a server can tell whether its snapshot is behind.
 
 `set` is one transaction, taking holds in the global order: exclusive hold on the settings
 state row; then the setting row, held exclusively if present or created if absent (two
-concurrent creates of one absent row race on the uniqueness constraint, and the loser gets
-Conflict and retries once); read the value it replaces; write the new value (sealed if
-secret); increase the settings version; stamp the row; record the audit entry with the
-replaced and stored values, or "changed" for a secret. Two sysops changing one existing key:
-the second waits for the first, and each entry records the value it truly replaced.
+concurrent creates of one absent row race on the uniqueness constraint; the loser gets
+Conflict and retries once, a fixed backstop, then reports Conflict); read the value it
+replaces; write the new value (sealed if secret); increase the settings version; stamp the
+row; record the audit entry with the replaced and stored values, or "changed" for a secret.
+Two sysops changing one existing key: the second waits for the first, and each entry records
+the value it truly replaced. `setWithin` does the same inside the caller's transaction.
 
-The server's **started settings version** is a field of cluster's Server entity, written once
-per process by `markStarted` after the first snapshot load; `restartNeeded` compares against
-it.
+The server's started settings version is a field of cluster's Server entity; `restartNeeded`
+compares against it.
 
 ## Behaviour
 Serves: ADV-001
@@ -74,6 +80,7 @@ Serves: ADV-001
 | any | `set` for an undeclared key | NotFound |
 | any | `set` passing its deadline | Unavailable; the write's outcome is unknown; the tool shows the stored value on its next read |
 | any | `set` concurrently from two sessions or two servers | serialised by the holds above; both entries written |
+| any | the connection lost during `set` | Unavailable; the outcome is unknown until the next read |
 
 ## Failure directions
 Serves: ADV-001
@@ -100,8 +107,6 @@ Serves: ADV-001
 
 ## Configuration
 Serves: ADV-001
-| Key | Default | Kind | Scope | Apply | Exposed by |
-|---|---|---|---|---|---|
 None of its own; every key is declared by its owning subsystem.
 
 ## Security considerations
@@ -117,6 +122,9 @@ Serves: ADV-001
 - `set` by the local operator of server A on a connectivity key of server B → Denied.
 - `set` by the local operator on a board-scoped key, or on a server-scoped key that is not a
   connectivity setting → Denied.
+- `declare` of a board-scoped connectivity setting → Invalid; the process stops.
+- `list` by the local operator of server A → only server A's connectivity settings; by a
+  sysop → every key with its stored value, secret values withheld.
 - `set` with access control forced to error → Denied; nothing written; no audit entry.
 - `set` with audit forced to fail → rolled back.
 - `set` with `seal` forced to fail on a secret key → rolled back.
