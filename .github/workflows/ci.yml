@@ -5,6 +5,7 @@ on:
   push:
     branches: [development, main]
   merge_group:
+  workflow_dispatch:
 
 permissions: {}
 

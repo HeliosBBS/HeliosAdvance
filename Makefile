@@ -1,16 +1,16 @@
-SHELL := sh
-VERSION := $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
-LDFLAGS := -trimpath -ldflags "-s -w -X main.version=$(VERSION)"
-# The race detector needs cgo and therefore a C compiler; CI always has one.
-HAVE_CC := $(shell command -v gcc >/dev/null 2>&1 && echo yes)
-RACE := $(if $(HAVE_CC),-race,)
+# Recipes must run under both sh and cmd.exe: GNU Make on Windows ignores SHELL.
+# The race detector needs a C compiler, so CI passes RACE=-race; pass it locally too
+# when one is installed. Version: Go embeds the commit at build time; releases
+# stamp the tag with -X main.version.
+RACE ?=
+LDFLAGS ?= -s -w
 
 .PHONY: check build vet lint test vuln bootstrap
 
 check: build vet lint test vuln
 
 build:
-	go build $(LDFLAGS) ./...
+	go build -trimpath -ldflags "$(LDFLAGS)" ./...
 
 vet:
 	go vet ./...
@@ -19,7 +19,6 @@ lint:
 	golangci-lint run ./...
 
 test:
-	$(if $(HAVE_CC),,@echo "WARNING: no C compiler found, race detector skipped")
 	go test $(RACE) -count=1 ./...
 
 vuln:
