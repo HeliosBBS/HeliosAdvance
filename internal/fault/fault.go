@@ -17,58 +17,32 @@ const (
 
 type classError struct {
 	class Class
+	text  string
 }
 
 func (e classError) Error() string {
-	switch e.class {
-	case UnavailableClass:
-		return "unavailable"
-	case ConflictClass:
-		return "conflict"
-	case RefusedClass:
-		return "refused"
-	case InvalidClass:
-		return "invalid"
-	case DeniedClass:
-		return "denied"
-	case NotFoundClass:
-		return "not found"
-	case FatalClass:
-		return "fatal"
-	default:
-		return "unknown"
-	}
+	return e.text
 }
 
 var (
-	Unavailable error = classError{UnavailableClass}
-	Conflict    error = classError{ConflictClass}
-	Refused     error = classError{RefusedClass}
-	Invalid     error = classError{InvalidClass}
-	Denied      error = classError{DeniedClass}
-	NotFound    error = classError{NotFoundClass}
-	Fatal       error = classError{FatalClass}
+	Unavailable error = classError{UnavailableClass, "unavailable"}
+	Conflict    error = classError{ConflictClass, "conflict"}
+	Refused     error = classError{RefusedClass, "refused"}
+	Invalid     error = classError{InvalidClass, "invalid"}
+	Denied      error = classError{DeniedClass, "denied"}
+	NotFound    error = classError{NotFoundClass, "not found"}
+	Fatal       error = classError{FatalClass, "fatal"}
 )
 
+// ClassOf returns the class of an error by walking its wrap chain.
+// An error carries a class only by wrapping one of the exported sentinels
+// (Unavailable, Conflict, Refused, Invalid, Denied, NotFound, Fatal) with
+// fmt.Errorf("%w", ...) or errors.Join(...). If multiple classes are wrapped,
+// ClassOf returns the first found in depth-first order.
 func ClassOf(err error) Class {
-	if err == nil {
-		return None
+	var ce classError
+	if errors.As(err, &ce) {
+		return ce.class
 	}
-	for {
-		if ce, ok := err.(classError); ok {
-			return ce.class
-		}
-		u := errors.Unwrap(err)
-		if u == nil {
-			if uw, ok := err.(interface{ Unwrap() []error }); ok {
-				for _, e := range uw.Unwrap() {
-					if class := ClassOf(e); class != None {
-						return class
-					}
-				}
-			}
-			return None
-		}
-		err = u
-	}
+	return None
 }
