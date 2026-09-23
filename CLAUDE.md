@@ -85,7 +85,9 @@ deleted on merge; `release/vX.Y.Z` is cut from `development`, merged into `main`
 then merged back; `hotfix/vX.Y.Z` comes off `main` and merges both ways. The loop commits as
 the organisation's App, never as the developer, so the developer's review of its work is a
 real gate. Commit atomically and push as soon as a unit is verified; never end a session with
-verified work uncommitted or unpushed.
+verified work uncommitted or unpushed. Nothing lands on `development` or `main` by a direct
+push, the backlog included: a branch and a pull request every time, and a commit that
+records the developer's words (a brief, a backlog line) is authored as the developer.
 
 ## Rules
 
