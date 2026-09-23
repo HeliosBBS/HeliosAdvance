@@ -31,7 +31,6 @@ Permissions this corpus declares, and who holds them:
 |---|---|
 | `board.administer` | a sysop account |
 | `server.connectivity` for target server N | the local operator of server N, and a sysop account |
-| `server.stop` for target server N | the local operator of server N, and a sysop account |
 | `whos_online.view` | any logged-in caller, and a sysop account |
 | `audit.read` | a sysop account |
 
@@ -78,7 +77,7 @@ Serves: ADV-001
 | Surface | Attacker | Abuse | Decision | Fails closed |
 |---|---|---|---|---|
 | every gate | anyone | act without the permission | one check, called by every gate, with no other path | any failure is Denied |
-| the local operator | a holder of server N's bootstrap record | act on the board beyond server N | the permissions above give them only server N's connectivity and stop through the tools; they also hold server N's database login, which is trusted as a server, so the tools' scope is convenience and audit, not a boundary | n/a |
+| the local operator | a holder of server N's bootstrap record | act on the board beyond server N | the permissions above give them only server N's connectivity through the setup tool (stopping and starting are host operations, not board permissions); they also hold server N's database login, which is trusted as a server, so the tool's scope is convenience and audit, not a boundary | n/a |
 
 ## Negative tests
 Serves: ADV-001

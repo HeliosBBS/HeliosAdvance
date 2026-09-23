@@ -57,11 +57,10 @@ each writes its audit entry in its own transaction and fails with it.
 | previewReplan | `board.administer` | none | proposed ranges, affected nodes, the occupied ones among them, layout version | Denied, Unavailable |
 | applyReplan | `board.administer` | expected layout version | ranges | Denied, Conflict, Refused (nodes in use), Unavailable |
 | removeServer | `board.administer` | server, the server ID typed again | none | Denied, Invalid (mismatch), NotFound, Refused (already removed; the last active server; the login could not be revoked), Unavailable |
-| stopServer | `server.stop` for that server | server | none | Denied, NotFound, Unavailable |
 | markStarted | the engine itself | the settings version of its first snapshot | none | Unavailable |
 
-Starting a server is the host's service manager's operation, run by the local operator; the
-setup tool offers it beside stop.
+Starting and stopping a server are the host's service manager's operations, run by the local
+operator directly or through the setup tool; no board operation stops a server.
 
 **cluster.health v1**, external, over HTTP, body encoded as JSON (a public standard):
 `GET /health` on the management listener returns the detailed form when the connection's own
@@ -105,7 +104,6 @@ Serves: ADV-001
 | server ID | increasing identifier, the key; never reused because rows are never deleted |
 | display name | 1 to 32 code points (fixed backstop), no control characters, unique among active servers after normalisation to canonical composed form and default case folding as the Unicode Standard defines them |
 | status | `active` or `removed`; `removed` is terminal |
-| stop requested | set by `stopServer`; cleared at acquisition |
 | lease generation | increased at each acquisition |
 | lease expires at | database clock, or empty |
 | lease timeout used | the timeout written at the last renewal |
@@ -146,7 +144,7 @@ Check-then-act operations, each one transaction taking holds in the global order
 1. **Acquire lease** (Admitting, and every renewal interval in Fenced): exclusive hold on the
    own server row; succeed only if active and the lease is empty or expired; read the lease
    timeout setting (the default if unset) and the layout row; increase the generation; write
-   expiry = now + timeout, the informational fields, clear stop requested; clear the
+   expiry = now + timeout, the informational fields; clear the
    occupant fields of every own node row, in ascending order; read back what renewal reads
    back. A live lease held by anyone makes it Conflict. If the record's transport or address
    differs from the server row's stored values, write the audit entry `server.record.change`
@@ -155,10 +153,9 @@ Check-then-act operations, each one transaction taking holds in the global order
 2. **Renew lease** (every renewal interval in Serving, Degraded and Draining): compare-and-set
    on the own server row matching own ID, own generation, active, and expiry later than now;
    write expiry = now + timeout, the reported HTTP fields. In the same transaction read back:
-   the minimum engine version, the settings version, own status, stop requested, own count
-   and range from the layout row, own occupied count under the occupancy rule, and the board's
-   occupied count. When no rows matched, read back own status and stop requested all the
-   same. A Conflict from contention is retried within the interval; Unavailable at the
+   the minimum engine version, the settings version, own status, own count and range from
+   the layout row, own occupied count under the occupancy rule, and the board's occupied
+   count. When no rows matched, read back own status all the same. A Conflict from contention is retried within the interval; Unavailable at the
    deadline is the "database Unavailable" input. Renewal never waits on a layout operation,
    because it holds only the server row and reads the layout row without holding it. The
    operation is bound to the bootstrap record's identity; it cannot name another server.
@@ -179,9 +176,10 @@ Check-then-act operations, each one transaction taking holds in the global order
    every node row whose owner changes, increases the layout version, and records its audit
    entry. setNodeCount and applyReplan compare the expected layout version and fail with
    Conflict if it moved.
-6. **Drain**: compare-and-set on the own server row matching own ID and own generation:
-   expiry = now; then clear own node rows whose claim generation is the own generation. Zero
-   rows on the first step means a successor holds the lease; do nothing further.
+6. **Drain** (a host stop): compare-and-set on the own server row matching own ID and own
+   generation: expiry = now; then clear own node rows whose claim generation is the own
+   generation; record the audit entry `server.stop` (actor: the local operator of this server).
+   Zero rows on the first step means a successor holds the lease; do nothing further.
 7. **Remove server**: operation 5, plus: Refused if it is the last active server; status
    `removed`, the node rows deleted, the lease cleared, and the server's database login
    revoked through join v1 inside the same transaction, which ends that login's open
@@ -232,11 +230,10 @@ the cluster mutex, each recorded as an applied change and never applied twice.
 
 A crash exits with any other code, which the service manager restarts.
 
-**Operator stop**: `stopServer` sets stop requested, read back by the next renewal; or the
-host's service manager asks the process to stop, which the process treats the same way at
-once (a host event, not audited: `stopServer` is audited by its own transaction).
+**Host stop**: the host's service manager asks the process to stop, directly or through the
+setup tool. No board operation stops a server; the drain that follows records the stop.
 
-| State \ input | renewal or acquisition succeeds | renewal matches nothing | database Unavailable | Conflict on renewal | stop (read back or from the host) | removed (read back) | minimum raised above window | duplicate process |
+| State \ input | renewal or acquisition succeeds | renewal matches nothing | database Unavailable | Conflict on renewal | host stop | removed (read back) | minimum raised above window | duplicate process |
 |---|---|---|---|---|---|---|---|---|
 | Admitting | own status `removed` → Refused; version outside window → Refused; acquired → Serving | n/a | stay; retry each renewal interval | retry now | Stopped | Refused | Refused | a live lease held by another → wait one renewal interval and retry; still held after one lease timeout plus one renewal interval → Refused ("already running elsewhere") |
 | Serving | refresh settings if the version moved; update cached counts; stay | end every session now; if the read-back says removed → Stopped; else → Fenced | → Degraded | retry within the interval; at the deadline treat as Unavailable | → Draining | end every session now → Stopped | → Draining | cannot acquire or renew; never disturbs this one |
@@ -308,7 +305,7 @@ Serves: ADV-001
 | `server.remove` | removeServer | name, `active`, range, occupied node numbers | `removed` |
 | `server.node_count.change` | setNodeCount | count, range | count, range |
 | `layout.replan` | applyReplan that changes anything | every active range | every active range |
-| `server.stop` | stopServer | lease state | stop requested |
+| `server.stop` | the drain that follows a host stop | lease state | drained |
 | `server.record.change` | acquisition finding the record's transport or address changed | transport, address | transport, address |
 
 The HTTP connection limit is a setting (`http.connection_limit`) and its change is audited by
@@ -329,7 +326,7 @@ Serves: ADV-001
 
 Tool screens: Servers (listServers, restart-needed and record-differs flags); Server detail
 (count with the resulting range or refusal, HTTP limit, transport and address as reported,
-remove with typed confirmation, stop); Layout (previewReplan; apply disabled while any
+remove with typed confirmation); Layout (previewReplan; apply disabled while any
 affected node is occupied, listing them); Board (lease timeout in renewals with the
 resulting seconds, trusted proxy list). In the setup tool, for its own server only: the
 bootstrap record's address, trust anchor and transport, the listen addresses, stop and
@@ -351,7 +348,7 @@ Serves: ADV-001
 ## Negative tests
 Serves: ADV-001
 The gate tests cover each registry operation by name (createBoard, addServer, listServers,
-setNodeCount, previewReplan, applyReplan, removeServer, stopServer) and whosOnline.list.
+setNodeCount, previewReplan, applyReplan, removeServer) and whosOnline.list.
 Database failures and clock movement are injected through the harness property the
 architecture states.
 
@@ -399,7 +396,7 @@ architecture states.
 42. `cluster.trusted_proxies` with a name or an unparseable entry → Invalid; stored list unchanged.
 43. A clock gap longer than the timeout (injected) → the lease treated as lost at the next checkpoint.
 44. Release twice for one session → both succeed; the node is free once.
-45. stopServer → `server.stop` audited; the server drains at its next renewal and exits with the no-restart code; a host stop → the same drain, no entry.
+45. A host stop → the server drains, `server.stop` is audited by the drain with the local operator as actor, and the process exits with the no-restart code; a host stop with the database unreachable → the drain writes nothing, the process exits at the local deadline.
 46. createBoard when a board exists → Refused; createBoard by a local operator on first run → the board row, the first server, its login and range exist, `board.create` audited.
 47. The setup tool changes the record's transport, then the engine restarts → `server.record.change` is written at acquisition with the old and new transport; with audit forced to fail, the acquisition fails.
 48. Conflict from contention on renewal (injected) → retried within the interval; no session ends.
