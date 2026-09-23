@@ -1,6 +1,6 @@
 # Helios Advance BBS
 
-A modern, enterprise-grade bulletin board system in the spirit of VBBS and VADV.
+A modern bulletin board system in the spirit of VBBS and VADV.
 
 The terminal experience is meant to feel authentically classic. The internals are
 uncompromisingly modern. A scripting layer sits between the two and carries all of the BBS
@@ -17,15 +17,18 @@ worked on now.
 
 The project is designed feature-first: the developer writes a brief for each feature in
 `features/`, and the architecture and subsystem specifications in `docs/spec/` are derived
-from those briefs, with every section naming the features it serves. `CONSTITUTION.md` holds
-the principles the whole system works from.
+from those briefs, with every section naming the features it serves. The specifications are
+language-neutral: anyone should be able to rebuild the system from them alone, in any
+language; the stack actually used is a separate decision in `docs/stack.md`.
+`CONSTITUTION.md` holds what is specific to the engine; the principles shared across the
+estate live in the [HeliosSkills](https://github.com/HeliosBBS/HeliosSkills) plugin.
 
 ## The estate
 
 | Project | What it is | Licence |
 |---|---|---|
 | [HeliosDoorKit](https://github.com/HeliosBBS/HeliosDoorKit) | Wire protocol and multi-language SDK for BBS doors. Not tied to this BBS. | Apache-2.0 |
-| HeliosDoors | A BBS-agnostic door hosting service: a separate daemon that runs doors and takes callers from any BBS that supports it. This engine hands its callers to it rather than launching doors itself. | to be decided |
+| [HeliosDoors](https://github.com/HeliosBBS/HeliosDoors) | A BBS-agnostic door hosting service: a separate daemon that runs doors and takes callers from any BBS that supports it. This engine hands its callers to it rather than launching doors itself. | AGPLv3-only |
 | [HeliosPortal](https://github.com/HeliosBBS/HeliosPortal) | Progressive web app with an address book for many Helios Advance boards. | AGPLv3-only |
 | [HeliosSIP](https://github.com/HeliosBBS/HeliosSIP) | SIP-to-SSH gateway, so a caller with a modem and a VoIP line can reach any SSH or Telnet host. | AGPLv3-only |
 | HeliosLoadTest | Load-test harness for a running board. Private, because it is a load generator. | AGPLv3-only |
