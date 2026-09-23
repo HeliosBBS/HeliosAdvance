@@ -62,7 +62,10 @@ Conflict and retries once, a fixed backstop, then reports Conflict); read the va
 replaces; write the new value (sealed if secret); increase the settings version; stamp the
 row; record the audit entry with the replaced and stored values, or "changed" for a secret.
 Two sysops changing one existing key: the second waits for the first, and each entry records
-the value it truly replaced. `setWithin` does the same inside the caller's transaction.
+the value it truly replaced. `setWithin` does the same inside the caller's transaction. `set`,
+`setWithin` and `initWithin` are database-side operations (the architecture's login tiers):
+a server login's direct write to a setting row or the settings state row is refused by the
+database, so every stored value passed validation and carries its entry.
 
 The server's started settings version is a field of cluster's Server entity; `restartNeeded`
 compares against it.
@@ -136,6 +139,8 @@ Serves: ADV-001
 - A value failing validation → Invalid; the stored value unchanged.
 - Two concurrent first `set`s of one absent key → one Conflict retried, both entries written,
   the later value stored.
+- A direct write of a setting row or the settings state row under a server login, outside
+  `set` → rejected by the database; the stored value unchanged.
 
 ## Revision history
 - 2026-09-23: created for ADV-001.

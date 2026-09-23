@@ -36,7 +36,7 @@ server login is granted the right to.
 |---|---|
 | entry ID | increasing identifier, the key |
 | occurred at | the database clock |
-| actor kind | `sysop-account`, `local-operator`, `first-run-operator`, or `engine` (for an entry the engine writes about its own fault) |
+| actor kind | `sysop-account`, `local-operator`, `first-run-operator`, or `engine` (for an entry the engine writes on its own initiative: a start, a fault, a revocation) |
 | actor reference | the account, or the server ID the local operator acted for |
 | origin server | the server the action ran on, if any |
 | action | a name declared by the subsystem that owns the action |
@@ -91,8 +91,8 @@ Serves: ADV-001
 - An action whose `record` is forced to fail → the action is rolled back; nothing changed.
 - `list` with access control forced to error → Denied.
 - `list` by an actor without the permission → Denied.
-- An update or delete of an entry attempted with a server login, or with a login created
-  through join v1 → rejected by the database.
+- An update or delete of an entry attempted with any server login → rejected by the
+  database.
 - `list` with page size 0 or 1,001 → Invalid.
 - Two pages with the cursor, with no writer between them → no entry repeated or skipped.
 

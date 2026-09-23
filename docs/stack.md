@@ -31,10 +31,14 @@ properties map onto it:
 | the encrypted-at-rest fields | encrypted by the engine under the board's key-encryption key before they are written |
 | TLS to the database, certificate verified | the connection's TLS mode set to verify the server certificate against the trust anchor in the server's bootstrap record |
 | an entity | a table; a field a column; a key a primary key or unique index; a constraint a database constraint wherever the database can express it, else enforced inside the owning transaction |
+| a server login | a PostgreSQL role per server, with row-level security policies that bind its direct writes to its own server row and the node rows it owns, and grants that reach nothing else |
+| a database-side operation | a `SECURITY DEFINER` function owned by the schema-owning role, granted to the server roles, checking its preconditions before it writes |
+| the administrator credential | the schema-owning role's credential, held by no program; `hadv-setup` prompts for it at first run and at an upgrade |
 
 Schema changes are numbered, transactional, additive-only migrations that ship with the
-engine and run at start-up; the board's minimum engine version is raised only by a migration
-that needs it.
+engine and are applied by `hadv-setup` under the schema owner at first run and at an
+upgrade, never by the engine at start-up; the board's minimum engine version is raised only
+by a migration that needs it.
 
 ## Build and tooling
 

@@ -14,7 +14,8 @@ Serves: ADV-001
 As the estate glossary defines them: board, server, node, caller, session, surface, database,
 lease, sysop, local operator, setup tool, runtime configuration tools, bootstrap record,
 key-encryption key, layout, re-plan, occupancy, screen boundary, reconcile, trusted proxy
-list, public listener, management listener, actor.
+list, public listener, management listener, actor, database-side operation, administrator
+credential.
 
 ## Contracts
 Serves: ADV-001
@@ -80,16 +81,37 @@ realised by the stack:
 - **The database clock** is the one time source for every stored timestamp and every
   comparison of times across servers.
 - **An increasing identifier**, as the glossary defines it.
-- **A login** is what a program authenticates to the database with. A server login is bound
-  to one server ID: the database lets it write only that server's own row, layout row and
-  node rows, and read everything a server needs. A server login cannot create, disable or
-  revoke logins; login administration is one database-side operation, reachable only through
-  join v1 and createBoard, that records every login it creates against a server row.
-  Disabling a login takes part in the transaction that requests it and refuses new
-  connections from commit; ending its open connections and revoking it happen after commit
-  and are retried until done. Audit entries are owned by a role no server login holds, so no
-  server login can change or delete one; the database administrator's credential, used once
-  at first run, is outside this property.
+- **A login** is what a program authenticates to the database with. Every program on a
+  server's host authenticates with that server's login, except the setup tool at first run
+  and at an upgrade, which uses the administrator credential through database-access's
+  `openWith`. Rights come in three tiers, and the database enforces every one of them:
+  - **A server login** is bound to one server ID. It reads everything a server needs. It
+    writes directly only its own server row's fields other than identity, names, status and
+    removal (that is: the lease, version, informational, record and reported fields), and
+    the occupant fields and claim generation of the node rows it owns; it inserts audit
+    entries; and it calls the database-side operations. The database refuses every other
+    write from it: another server's row, any node row it does not own, the board row, a
+    layout row, a setting row, the settings state, an applied-change row, a login.
+  - **A database-side operation** runs inside the database with the data model owner's
+    rights and checks its own preconditions, so a mistaken or forged call cannot corrupt the
+    layout, mint a hidden login or lock out a live server, and each records the server it
+    ran from. They are the layout operations (createBoard, addServer, setNodeCount,
+    applyReplan, removeServer and removal's completion), the settings writes (`set`,
+    `setWithin`, `initWithin`) and the login operations cluster states. Any server login may
+    call them: a server holding a login can therefore run a registry operation directly, past
+    the access-control gate, which is the trust the brief grants a server login; the gate
+    bounds the tools and the sysop, and the operation's audit entry names the origin server.
+  - **The administrator credential** is held by no program. Only under it are the entities,
+    constraints, roles and database-side operations created or changed, applied-change rows
+    written, and a server's login secret reset. The engine never applies a data-model change:
+    at admission it refuses to start when a change its version requires is not recorded as
+    applied, naming the upgrade to run.
+
+  A login is created only inside the operation that creates its server row; disabling one
+  takes part in the transaction that removes its server and refuses new connections from
+  commit; ending its open connections and revoking it happen after commit and are retried
+  until done. Audit entries and applied-change rows are owned by the data model's owner, so
+  no server login can change or delete one.
 - **A notification** is delivered to every connected server after a commit, at most once,
   and may be lost; nothing in this corpus depends on receiving one.
 
@@ -110,7 +132,8 @@ suspended, and never goes backwards.
 ## Behaviour
 Serves: ADV-001
 Start-up order on every server: database-access opens the connection; configuration builds
-the registry; cluster checks the version, admits the server and holds its lease; configuration
+the registry; cluster checks the version and the applied changes, admits the server and holds
+its lease; configuration
 loads the snapshot; http opens the listeners; only then does any surface accept a caller.
 The process states are cluster's.
 
@@ -144,7 +167,7 @@ Serves: ADV-001
 | Surface | Attacker | Abuse | Decision | Fails closed |
 |---|---|---|---|---|
 | a caller at a surface | anyone on the network | act beyond a caller's standing | untrusted until a session vouches; every gate calls access-control | Denied |
-| a server at the database | anyone holding a server login | act as a server | a login is trusted as a server; the wire is protected by database-access; what a login can create or reach is bounded by the login properties above | no verified transport, no connection |
+| a server at the database | anyone holding a server login | act as a server, or beyond one | a login is trusted as a server; the wire is protected by database-access; what it writes directly, what only a database-side operation may do, and what only the administrator credential may do are the login tiers above | no verified transport, no connection; a write outside the tier is rejected |
 | the local operator | whoever holds a bootstrap record | act on the board | they hold a server login and are trusted as a server; the setup tool offers them only their server's connectivity, which is convenience and audit, not a boundary | n/a |
 | a sysop | an account holding the sysop permission | change the board | trusted as their permissions allow; every action audited | Denied on any check failure |
 
@@ -152,7 +175,8 @@ Serves: ADV-001
 Serves: ADV-001
 Tests inject database failures (a refused connection, a delayed or dropped write, an aborted
 transaction, a rejected login) and clock movement through a controllable connection and clock
-that the stack provides, and can open a connection under any server's login, so every
+that the stack provides, and can open a connection under any server's login or under the
+administrator credential, so every
 negative test in the subsystem documents can force its dependency to fail. None at this level.
 
 ## Revision history
