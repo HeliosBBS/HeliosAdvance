@@ -512,8 +512,11 @@ function Invoke-Iteration([int]$iteration) {
                 else { $marker = "HUMAN"; $detail = "the review passed but the box could not be ticked" }
                 break
             }
+            # A fix round runs a tier above the session that just missed: the first attended
+            # runs showed haiku and sonnet each reporting DONE with findings left unaddressed.
             $round++
-            $fixModel = if ($round -eq 1) { $tier } elseif ($round -eq 2) { Next-Tier $tier } else { $null }
+            $fixModel = if ($round -eq 1) { Next-Tier $tier } elseif ($round -eq 2) { Next-Tier (Next-Tier $tier) } else { $null }
+            if (-not $fixModel -and $round -le 2) { $fixModel = $tiers[-1] }
             if (-not $fixModel) {
                 & gh issue comment $number -R "$Owner/$Repo" --body ("Review findings remain after a fix round and a route-up:`n`n" + $review.Text) | Out-Null
                 $marker = "HUMAN"; $detail = "review findings remain after a fix round and a route-up; see the review comment"
