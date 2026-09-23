@@ -1,15 +1,30 @@
-# Read from the default branch (main); updates target development.
+# Read from the default branch (main); updates target development. A release must be
+# seven days old before it is proposed, so a bad one is usually pulled first; minor and
+# patch updates arrive as one pull request per ecosystem, merged by the queue once its
+# checks pass, and a major one arrives on its own for the developer.
 version: 2
 updates:
   - package-ecosystem: gomod
     directory: /
     target-branch: development
     schedule:
-      interval: weekly
+      interval: daily
+    cooldown:
+      default-days: 7
+    groups:
+      go-minor-and-patch:
+        patterns: ["*"]
+        update-types: [minor, patch]
     labels: [kind:infra, P3]
   - package-ecosystem: github-actions
     directory: /
     target-branch: development
     schedule:
-      interval: weekly
+      interval: daily
+    cooldown:
+      default-days: 7
+    groups:
+      actions-minor-and-patch:
+        patterns: ["*"]
+        update-types: [minor, patch]
     labels: [kind:infra, P3]
