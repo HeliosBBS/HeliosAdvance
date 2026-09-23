@@ -1,0 +1,40 @@
+# Build output
+/bin/
+/dist/
+/hadv
+/hadv.exe
+
+# Go test and coverage output
+*.test
+*.out
+coverage.*
+
+# Free Pascal / Lazarus build output
+lib/
+backup/
+*.ppu
+*.o
+*.compiled
+*.lps
+
+# Editor and OS metadata
+.idea/
+.vscode/
+*.swp
+*~
+.DS_Store
+Thumbs.db
+
+# Local runtime data and live config
+/data/
+hadv.toml
+
+# The issues mirror is regenerated, never committed
+issues.jsonl
+
+# Anything marked local is private by convention and never published
+*.local.md
+*.local.yml
+*.local.yaml
+.env
+.env.*
