@@ -34,7 +34,7 @@ Gate for `set` and `list`, through access-control v1: `board.administer`; or
 then shows only that server's connectivity settings). Any error from the check is Denied.
 `read` and `setWithin` run inside another subsystem's transaction and are gated by that
 subsystem's operation. `set` is the process-side step (the gate, validation against the
-declaration, NotFound for an undeclared key) that calls the database-side write; the write
+declaration, NotFound for an undeclared key) that calls `writeSetting`, the database-side write, which
 itself raises no Invalid or NotFound, and a caller of `setWithin` checks the rule for the
 key it writes (the layout operations check the HTTP limit's bounds inside themselves). The engine calls cluster.registry v1 `markStarted` once after its
 first snapshot load.
@@ -65,8 +65,10 @@ Conflict and retries once, a fixed backstop, then reports Conflict); read the va
 replaces; write the new value (sealed if secret); increase the settings version; stamp the
 row; record the audit entry with the replaced and stored values, or "changed" for a secret.
 Two sysops changing one existing key: the second waits for the first, and each entry records
-the value it truly replaced. `setWithin` does the same inside the caller's transaction. `set`,
-`setWithin` and `initWithin` are database-side operations (the architecture's login tiers):
+the value it truly replaced. `setWithin` does the same inside the caller's transaction. The
+database-side write is `writeSetting`, which `set` reaches from the process and `setWithin`
+from inside another operation; it and `initWithin` are database-side operations (the
+architecture's login tiers):
 a server login's direct write to a setting row or the settings state row is refused by the
 database, so every stored value carries its entry and moved the settings version.
 Validation against the declaration is the tools' job: `set` reports Invalid before writing;
@@ -146,10 +148,10 @@ Serves: ADV-001
 - Two concurrent first `set`s of one absent key → one Conflict retried, both entries written,
   the later value stored.
 - A direct write of a setting row or the settings state row under a server login, outside
-  `set` → rejected by the database; the stored value unchanged.
-- `cluster.lease_timeout_renewals` stored as 0 by a direct `set` under a server login → its
-  entry exists; every server's `get` returns the default and no lease shortens; an
-  acquisition after the store writes expiry = now + the default; `list` shows the stored
+  `writeSetting` → rejected by the database; the stored value unchanged.
+- `cluster.lease_timeout_renewals` stored as 0 by a direct `writeSetting` under a server login → its
+  entry exists; every server's `get` returns the default and no lease shortens; after that write, an
+  acquisition writes expiry = now + the default; `list` shows the stored
   value as invalid; a later valid `set` replaces it.
 
 ## Revision history

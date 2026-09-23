@@ -31,6 +31,7 @@ Permissions this corpus declares, and who holds them:
 | `board.administer` | none | a sysop account |
 | `board.create` | none | the first-run operator: the principal whose administrator credential the database accepted through database-access v1 `openWith` |
 | `board.upgrade` | none | the first-run operator |
+| `login.reset` | a server | the first-run operator |
 | `server.connectivity` | a server | the local operator of that server, and a sysop account |
 | `whos_online.view` | none | a caller that sessions v1 vouches for as logged in, and a sysop account |
 | `audit.read` | none | a sysop account |
@@ -58,7 +59,7 @@ Serves: ADV-001
 | a permission the actor holds; the permission takes no target and none is given | allowed |
 | a permission the actor holds; the permission takes no target and a target is given | allowed; the target is ignored |
 | `whos_online.view` for a caller that sessions v1 vouches for but reports not logged in | Denied |
-| `board.create` or `board.upgrade` for any principal but the first-run operator | Denied |
+| `board.create`, `board.upgrade` or `login.reset` for any principal but the first-run operator | Denied |
 | a permission the actor holds for server N; target server N | allowed |
 | a permission the actor holds for server N; target server M, or no target | Denied |
 | a permission the actor does not hold | Denied |
@@ -98,8 +99,8 @@ Serves: ADV-001
 - The local operator of server A asking `server.connectivity` for server B → Denied.
 - The local operator asking `server.connectivity` with no target → Denied.
 - The local operator asking `board.administer` → Denied.
-- A sysop account, a caller, or a local operator asking `board.create` or `board.upgrade` →
-  Denied.
+- A sysop account, a caller, or a local operator asking `board.create`, `board.upgrade` or
+  `login.reset` → Denied.
 - A caller vouched for but not logged in asking `whos_online.view` → Denied.
 - A caller whose session sessions v1 cannot vouch for asking `whos_online.view` → Denied.
 - A caller asking `whos_online.view` with sessions v1 forced to error → Denied.

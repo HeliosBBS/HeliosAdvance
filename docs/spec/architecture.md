@@ -107,7 +107,8 @@ realised by the stack:
     mistaken or forged call therefore cannot corrupt the layout or mint an unrecorded login,
     and what it did is on the record. They are the layout operations (createBoard, addServer,
     setNodeCount, applyReplan, removeServer and removal's completion), the settings writes
-    (`set`, `setWithin`, `initWithin`), cluster's login operations, and applyChanges, which
+    (`writeSetting`, which configuration's `set` and `setWithin` reach, and `initWithin`),
+    cluster's login operations, and applyChanges, which
     alone runs only under the administrator credential. Any server login may call the
     others: a server holding a login can therefore run a registry operation directly, past
     the access-control gate, which is the trust the brief grants a server login; the gate
@@ -126,8 +127,8 @@ realised by the stack:
 
 Hold order, global, so that no two transactions wait on each other: board, then settings
 state, then server rows in ascending ID, then layout rows in ascending server ID, then
-setting rows in key order, then node rows in ascending number. A transaction takes holds in
-that order and never goes back.
+setting rows in key order, then node rows in ascending number, then login rows in login-name order. A transaction
+takes holds in that order and never goes back.
 
 Identity sources: server IDs, audit entry IDs and the applied-change order are increasing
 identifiers; a change identifier is fixed by the release that ships it. Node numbers and layout positions are assigned by cluster's layout operations
