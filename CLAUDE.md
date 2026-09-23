@@ -71,14 +71,17 @@ every pinned dispatch is verified from the transcript.
 
 ## Branches and identity
 
-`main` is the default branch and holds the skeleton and releases only, each a signed SemVer
-tag; cutting a release is a human checkpoint and is when the AGPLv3 section 13 source offer
-attaches, so the exact commit must exist here. `development` is the integration branch:
-everything lands through a pull request that closes its issue, through the merge queue, on
-green required checks. Work branches are `issue-<n>-<slug>` in their own worktree, deleted on
-merge. The loop commits as the organisation's App, never as the developer, so the developer's
-review of its work is a real gate. Commit atomically and push as soon as a unit is verified;
-never end a session with verified work uncommitted or unpushed.
+GitFlow, with `main` and `development` as the two long-lived branches. `main` is the default
+branch and holds the skeleton and releases only, each a signed SemVer tag; cutting a release
+is a human checkpoint and is when the AGPLv3 section 13 source offer attaches, so the exact
+commit must exist here. `development` is the integration branch: everything lands through a
+pull request that closes its issue, through the merge queue, on green required checks.
+`feature/issue-<n>-<slug>` branches come off `development`, live in their own worktree and are
+deleted on merge; `release/vX.Y.Z` is cut from `development`, merged into `main` and tagged,
+then merged back; `hotfix/vX.Y.Z` comes off `main` and merges both ways. The loop commits as
+the organisation's App, never as the developer, so the developer's review of its work is a
+real gate. Commit atomically and push as soon as a unit is verified; never end a session with
+verified work uncommitted or unpushed.
 
 ## Rules
 
@@ -101,11 +104,17 @@ never end a session with verified work uncommitted or unpushed.
   never log a secret, password, token or code. Every queue, limit and counter is measurable.
 - **Config is part of the feature**: defaults in code, overrides from the config file, every
   key documented with its kind; a sysop setting is done only when both configuration tools
-  expose it, in the same PR as the code.
+  expose it, in the same PR as the code. **Secure by default**: every default is the safe
+  setting, and loosening it is the sysop's explicit choice in those tools.
 - **Schema changes are additive**, numbered, transactional, `IF NOT EXISTS`; never edit a
   committed migration.
-- **Dependencies** are weighed against native code, pinned, audited for licence, and
+- **Home-grown first.** The ladder decides, in order: does it need to exist, is it already in
+  the codebase, does the standard library or the platform do it, does an installed dependency
+  do it, can it be one line, then write it. A new dependency needs a written cost-benefit
+  (what it saves, what it exposes) in its PR, is pinned, audited for licence, and
   `govulncheck`-clean; CI fails on a flagged vulnerability.
+- **Public prose runs through `humanizer`** before it lands: README, sysop guide, release
+  notes, issue write-ups, Discussions, and any comment long enough to carry a voice.
 - **Builds are reproducible** and stamped with the exact commit; releases carry provenance
   and an SBOM.
 - **Lang strings** use named tags (`{TAG_NAME}`), never positional arguments.

@@ -237,8 +237,8 @@ function Invoke-Iteration([int]$iteration) {
     $tier = if ($pick.planned) { Get-TaskTier $issue.body } else { "sonnet" }
     if ($tier -eq "session") { Set-Human $number "the next task is session-tier: it needs an interactive session with the developer"; return "continue" }
 
-    $branch = "issue-$number-$(Slug $issue.title)"
-    $worktree = Join-Path $base "$Repo.wt" $branch
+    $branch = "feature/issue-$number-$(Slug $issue.title)"
+    $worktree = Join-Path $base "$Repo.wt" ($branch -replace '/', '-')
     if (-not (Test-Path $worktree)) {
         $remote = & git.exe -C $repoDir ls-remote --heads origin $branch
         $start = if ($remote) { "origin/$branch" } else { "origin/development" }
