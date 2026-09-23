@@ -21,7 +21,8 @@ from those briefs, with every section naming the features it serves. The specifi
 language-neutral: anyone should be able to rebuild the system from them alone, in any
 language; the stack actually used is a separate decision in `docs/stack.md`.
 `CONSTITUTION.md` holds what is specific to the engine; the principles shared across the
-estate live in the [HeliosSkills](https://github.com/HeliosBBS/HeliosSkills) plugin.
+estate live in the [HeliosSkills](https://github.com/HeliosBBS/HeliosSkills) plugin. The
+[FAQ](docs/FAQ.md) says why this exists, who writes it, and how AI is used.
 
 ## The estate
 
