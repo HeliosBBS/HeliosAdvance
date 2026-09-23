@@ -106,7 +106,9 @@ verified work uncommitted or unpushed.
   key documented with its kind; a sysop setting is done when `hadv-config` exposes it in the
   same PR as the code and a linked issue exists for `hadv-config-gui`, blocked on that PR,
   session-tier, closing the setting. The graphical tools are the developer's: they write the
-  forms, and a model writes only the non-visual Pascal, reviewed in full. **Secure by
+  forms, and a model writes only the non-visual Pascal, reviewed in full. The developer's own
+  code gets the same two-stage review against the spec as the loop's, told whose code it is
+  and that the standard does not soften for the author. **Secure by
   default**: every default is the safe setting, and loosening it is the sysop's explicit
   choice in whichever tool exposes it.
 - **Schema changes are additive**, numbered, transactional, `IF NOT EXISTS`; never edit a
