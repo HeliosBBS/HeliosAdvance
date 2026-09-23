@@ -164,6 +164,14 @@ Recurring shapes ordinary review misses; every review prompt names them.
   you were not asked to touch are not yours to sweep.
 - Supported targets: `linux/amd64`, `linux/arm64`, `windows/amd64`; everything builds on all
   three.
+- **Go practices a linter cannot decide** (what it can is in `.golangci.yml`, enforced by
+  `make check`): every goroutine has an owner and stops when its context ends; an error is
+  returned or logged, never both; no panic crosses a package boundary; anything read from the
+  network or a file has a size bound; secrets compare in constant time, with the standard
+  library's crypto and nothing hand-rolled; an interface is declared where it is consumed; no
+  `util`, `common` or `helpers` package; tests synchronise on events and the fake clock, never
+  on a sleep, and clean up with `t.TempDir` and `t.Cleanup`. Pascal and Lua practices arrive
+  with the skills for those languages.
 
 ## Working method
 

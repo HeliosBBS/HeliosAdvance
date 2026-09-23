@@ -1,0 +1,62 @@
+# The mechanical half of CLAUDE.md's Go practices: what a linter can decide is decided
+# here, so make check, CI and the loop enforce it without anyone reading prose.
+version: "2"
+
+linters:
+  default: standard
+  enable:
+    - bodyclose
+    - contextcheck
+    - depguard
+    - errorlint
+    - forbidigo
+    - gosec
+    - nilerr
+    - noctx
+    - nolintlint
+    - paralleltest
+    - rowserrcheck
+    - sqlclosecheck
+    - tparallel
+  settings:
+    depguard:
+      rules:
+        # A new module is a new line here, in the same pull request as its written
+        # cost-benefit: the home-grown ladder made mechanical.
+        dependencies:
+          list-mode: strict
+          allow:
+            - $gostd
+            - github.com/heliosbbs/heliosadvance
+            - github.com/jackc/pgx/v5
+            - golang.org/x/sys
+            - golang.org/x/term
+          deny:
+            - pkg: math/rand
+              desc: use crypto/rand; nothing here needs a predictable sequence
+            - pkg: log
+              desc: use log/slog, structured, with a correlation ID
+    forbidigo:
+      analyze-types: true
+      forbid:
+        # A server's own clock must count suspended time and never go backwards, which
+        # only internal/clock guarantees.
+        - pattern: ^time\.(Now|Since|Until)$
+          msg: use internal/clock
+    gosec:
+      excludes:
+        # errcheck already reports an unchecked error.
+        - G104
+    nolintlint:
+      require-explanation: true
+      require-specific: true
+  exclusions:
+    rules:
+      # The error classes' own wrap-chain walk inspects each link directly, because
+      # errors.As would stop at an undeclared class value.
+      - path: internal/fault/
+        linters: [errorlint]
+      - path: internal/clock/
+        linters: [forbidigo]
+      - path: _test\.go
+        linters: [forbidigo]
