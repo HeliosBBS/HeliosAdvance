@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Pascal Fairchild
+// SPDX-License-Identifier: AGPL-3.0-only
+
 // Package fault holds the error classes every contract uses.
 package fault
 

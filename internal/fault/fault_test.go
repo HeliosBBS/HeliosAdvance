@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Pascal Fairchild
+// SPDX-License-Identifier: AGPL-3.0-only
+
 package fault
 
 import (
