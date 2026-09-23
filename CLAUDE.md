@@ -58,6 +58,8 @@ private advisory.
 
 ## Routing
 
+Quality first, token saving second: in doubt, route up, never down, and a saving is taken
+only where the task has one right answer.
 Sonnet 5 at high effort is the default, not a floor and not a ceiling: every model and effort
 level is available and the task's shape picks it. Route down (Haiku, or Sonnet at low) for
 mechanical work with one right answer; route up (Opus, or Fable in-session) when reasoning is
