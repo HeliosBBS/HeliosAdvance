@@ -42,6 +42,7 @@ func TestClassOf(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			got := ClassOf(tt.err)
 			if got != tt.class {
 				t.Errorf("ClassOf(%v) = %v, want %v", tt.err, got, tt.class)
