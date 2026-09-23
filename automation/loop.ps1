@@ -342,7 +342,11 @@ function Invoke-Iteration([int]$iteration) {
     $pick = $json | ConvertFrom-Json
     $number = [int]$pick.number
     $issue = Get-Content (Join-Path $repoDir "issues.jsonl") | ForEach-Object { $_ | ConvertFrom-Json } | Where-Object number -eq $number
-    if ($pick.claimed_by -ne $identity) { Push-Location $repoDir; & work claim $number | Out-Null; Pop-Location }
+    if ($pick.claimed_by -ne $identity) {
+        Push-Location $repoDir
+        try { $claim = & work claim $number 2>&1; $lost = $LASTEXITCODE -ne 0 } finally { Pop-Location }
+        if ($lost) { Log "#${number}: $claim; picking again next iteration"; return "continue" }
+    }
     Log "#${number}: $($issue.title)"
 
     $tier, $effort = if ($pick.planned) { Get-TaskTag $issue.body } else { @("sonnet", "high") }
