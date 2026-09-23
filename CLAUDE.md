@@ -103,9 +103,12 @@ verified work uncommitted or unpushed.
 - **Observability**: `log/slog` only, structured, with a correlation ID per session or job;
   never log a secret, password, token or code. Every queue, limit and counter is measurable.
 - **Config is part of the feature**: defaults in code, overrides from the config file, every
-  key documented with its kind; a sysop setting is done only when both configuration tools
-  expose it, in the same PR as the code. **Secure by default**: every default is the safe
-  setting, and loosening it is the sysop's explicit choice in those tools.
+  key documented with its kind; a sysop setting is done when `hadv-config` exposes it in the
+  same PR as the code and a linked issue exists for `hadv-config-gui`, blocked on that PR,
+  session-tier, closing the setting. The graphical tools are the developer's: they write the
+  forms, and a model writes only the non-visual Pascal, reviewed in full. **Secure by
+  default**: every default is the safe setting, and loosening it is the sysop's explicit
+  choice in whichever tool exposes it.
 - **Schema changes are additive**, numbered, transactional, `IF NOT EXISTS`; never edit a
   committed migration.
 - **Home-grown first.** The ladder decides, in order: does it need to exist, is it already in

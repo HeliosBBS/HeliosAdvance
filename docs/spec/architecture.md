@@ -38,7 +38,12 @@ Programs, each a separate process: the engine; the setup tool, run by the local 
 the server's host; the runtime configuration tools (command-line and graphical), run on a
 server's host, acting as the sysop who logs into them through accounts v1. Which account each
 runs as, per protection tier, is database-access's table. Every program reaches the database
-only through database-access; no other subsystem holds a connection.
+only through database-access v1; no other subsystem holds a connection. The graphical runtime
+configuration tool shares no code with the other programs and carries a second
+implementation of two mechanisms, each described by its owner: the database-access v1
+operations it uses (database-access) and the access-control v1 check (access-control). A
+second implementation follows the owning document unchanged, and that document's negative
+tests run against every implementation, so two implementations cannot drift apart unnoticed.
 
 Error classes, used by every contract and owned here:
 
@@ -183,6 +188,7 @@ Serves: ADV-001
 | a server at the database | anyone holding a server login | act as a server, or beyond one | a login is trusted as a server; the wire is protected by database-access; what it writes directly, what only a database-side operation may do, and what only the administrator credential may do are the login tiers above | no verified transport, no connection; a write outside the tier is rejected |
 | the local operator | whoever holds a bootstrap record | act on the board | they hold a server login and are trusted as a server; the setup tool offers them only their server's connectivity, which is convenience and audit, not a boundary | n/a |
 | a sysop | an account holding the sysop permission | change the board | trusted as their permissions allow; every action audited | Denied on any check failure |
+| the graphical tool at the database | whoever runs it, and anyone on the network path | reach the database over a weaker wire, or past a weaker check, than the engine's | its database-access and its gate implement the owning documents unchanged and pass the same negative tests | as database-access and access-control: no verified transport, no connection; any check failure is Denied |
 
 ## Negative tests
 Serves: ADV-001
@@ -190,7 +196,11 @@ Tests inject database failures (a refused connection, a delayed or dropped write
 transaction, a rejected login) and clock movement through a controllable connection and clock
 that the stack provides, and can open a connection under any server's login or under the
 administrator credential, so every
-negative test in the subsystem documents can force its dependency to fail. None at this level.
+negative test in the subsystem documents can force its dependency to fail. The database-access
+and access-control negative tests run against each implementation of those contracts, the
+graphical runtime configuration tool's included. None at this level.
 
 ## Revision history
 - 2026-09-23: created for ADV-001.
+- 2026-09-23: the graphical runtime configuration tool carries its own database-access and
+  access-control implementation, held equal by the shared negative tests.

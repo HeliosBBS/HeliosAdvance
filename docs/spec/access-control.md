@@ -24,6 +24,9 @@ Provided, **access-control v1**:
 Any failure inside the check, including an unreachable database or a dependency that cannot
 answer, is Denied.
 
+The graphical runtime configuration tool carries its own implementation of `authorize` over
+the same holder table; the negative tests below run against it as against the engine's.
+
 Permissions this corpus declares, and who holds them:
 
 | Permission | Target | Holder |
@@ -98,6 +101,8 @@ Serves: ADV-001
 
 ## Negative tests
 Serves: ADV-001
+Each runs against every implementation of the contract.
+
 - The local operator of server A asking `server.connectivity` for server B → Denied.
 - The local operator asking `server.connectivity` with no target → Denied.
 - The first-run operator asking `login.reset` with no target → Denied; a sysop account asking
@@ -114,3 +119,4 @@ Serves: ADV-001
 
 ## Revision history
 - 2026-09-23: created for ADV-001.
+- 2026-09-23: the graphical runtime configuration tool's own implementation of the check.

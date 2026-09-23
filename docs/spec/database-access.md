@@ -32,6 +32,12 @@ Provided, **database-access v1**, to every subsystem and program:
 | recordFields | none | the record's non-secret fields: server ID, database address, transport, trust-anchor fingerprint, login name, record version | Fatal |
 | writeRecord | the setup tool only: the fields to change | none | Fatal (cannot write at the required tier), Invalid (transport invalid for the address) |
 
+The graphical runtime configuration tool carries its own implementation of `open`,
+`transaction`, `now`, `seal`, `unseal`, `reachable` and `recordFields`; it never calls
+`openWith`, `lockBoard` or `writeRecord`, and never writes the record. It reads the same record
+at the same protection tier, makes the same transport decision from the same table, and maps
+failures to the same classes; the negative tests below run against it as against the engine's.
+
 Consumed: none.
 
 ## Data model
@@ -177,6 +183,8 @@ Serves: ADV-001
 
 ## Negative tests
 Serves: ADV-001
+Each runs against every implementation of the contract.
+
 - Record readable by an account outside its tier → the program does not start; the fault is
   named.
 - A malformed record → Fatal; the message contains neither the login secret nor the key.
@@ -202,3 +210,5 @@ Serves: ADV-001
 
 ## Revision history
 - 2026-09-23: created for ADV-001.
+- 2026-09-23: the graphical runtime configuration tool's own implementation, and the negative
+  tests as the test of every implementation.
