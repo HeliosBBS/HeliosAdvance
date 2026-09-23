@@ -34,7 +34,10 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   option negotiation; connection limits, per-source throttling, idle timeouts. Depends on:
   servers, scripting layer, theme packs. Touches the load tester.
 - **Accounts and login**: sign-up, login, sessions across servers, lockouts; a second factor
-  when the account's role requires it. Depends on: scripting layer, Telnet caller.
+  when the account's role requires it. A user may set themselves private and then does not
+  appear in who's-online except to a role holding the permission to see private users; a
+  user never sees someone they have blocked in who's-online (the who's-online contract takes
+  the viewer as an input for this). Depends on: scripting layer, Telnet caller.
 - **Role-based access control**: roles carry permissions and configuration (upload/download
   ratio, whether 2FA is required, and the like). Every gate fails closed; every operator action
   is audited. Seeded roles, by fixed ID because names are editable: 1 Sysop, 2 Co-Sysop,
@@ -46,7 +49,8 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   cannot be deleted; editable. Guest: not signed in; cannot be deleted; editable. New User:
   baseline probationary access; can be deleted; fully editable. Account #1 is always the main
   sysop account and owner of the system. The Sysop role requires 2FA by default; the sysop may
-  turn that off for the role. Depends on: accounts and login.
+  turn that off for the role. Sysop and Co-Sysop hold the permission to see private users in
+  who's-online by default. Depends on: accounts and login.
 - **Second factor**: TOTP; passkeys where the surface allows; required per role; the initial
   #1 Sysop enrols during first-run setup. Depends on: accounts, RBAC. Touches the Portal.
 - **Telnet over TLS caller**: the Telnet experience over a TLS-wrapped listener. Depends on:
