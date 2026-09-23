@@ -108,7 +108,7 @@ verified work uncommitted or unpushed.
   setting, and loosening it is the sysop's explicit choice in those tools.
 - **Schema changes are additive**, numbered, transactional, `IF NOT EXISTS`; never edit a
   committed migration.
-- **Home-grown first.** The `ponytail` ladder decides: does it need to exist, is it already in
+- **Home-grown first.** The ladder decides, in order: does it need to exist, is it already in
   the codebase, does the standard library or the platform do it, does an installed dependency
   do it, can it be one line, then write it. A new dependency needs a written cost-benefit
   (what it saves, what it exposes) in its PR, is pinned, audited for licence, and
