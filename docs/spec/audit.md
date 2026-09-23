@@ -36,7 +36,7 @@ server login is granted the right to.
 |---|---|
 | entry ID | increasing identifier, the key |
 | occurred at | the database clock |
-| actor kind | `sysop-account` or `local-operator` |
+| actor kind | `sysop-account`, `local-operator`, `first-run-operator`, or `engine` (for an entry the engine writes about its own fault) |
 | actor reference | the account, or the server ID the local operator acted for |
 | origin server | the server the action ran on, if any |
 | action | a name declared by the subsystem that owns the action |
@@ -84,6 +84,7 @@ Serves: ADV-001
 |---|---|---|---|---|
 | the audit log | a sysop acting through the tools, or any program | alter or remove entries | append-only, and the database grants no server login the right to change or delete an entry | none needed |
 | the audit log | a reader without the permission | learn operator actions | `list` gated on `audit.read` | error means Denied |
+| an entry's actor | a holder of any server login | forge an entry naming another actor | accepted: the actor is asserted by a program the board trusts as a server; the entry's origin server is recorded so a forged entry names the host it came from | n/a |
 
 ## Negative tests
 Serves: ADV-001

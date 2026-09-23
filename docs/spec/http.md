@@ -11,8 +11,7 @@ decides nothing about what a route may reveal.
 
 ## Terms
 Serves: ADV-001
-As the glossary defines them: public listener, management listener. **Open connection**: an
-accepted connection counted against a listener's limit.
+As the glossary defines them: public listener, management listener, open connection.
 
 ## Contracts
 Serves: ADV-001
@@ -86,7 +85,7 @@ Serves: ADV-001
 |---|---|---|---|---|
 | public listener | a flooder | hold every connection | the limit, plus header, body, write and idle deadlines, so a connection is held only by a client that is actually talking | at the limit, refuse |
 | management listener | a host on the management network, or the internet if the sysop bound it there | exhaust the process's sockets, or read detailed health | its own fixed limit, the same deadlines, loopback by default; detailed health is further gated by cluster's trusted proxy list | at the limit, refuse |
-| any listener | a client relying on a forwarded address | impersonate a trusted address | a listener reports the connection's own peer address to the handler and nothing else; a handler that wants a forwarded address consults a contract that owns that decision | none needed |
+| any listener | a client relying on a forwarded address | impersonate a trusted address | a listener reports the connection's own peer address to the handler and nothing else | none needed |
 
 ## Negative tests
 Serves: ADV-001

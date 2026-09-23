@@ -25,7 +25,8 @@ Provided, **configuration v1**:
 | restartNeeded | server | the restart-mode keys, board-scoped or scoped to that server, changed since that server's process loaded its first snapshot | Unavailable |
 | refresh | the settings version reported by the last lease renewal | none | Unavailable |
 | read | inside a caller's transaction: key, target server | the stored value, or the default when none is stored | NotFound |
-| setWithin | inside a caller's transaction: actor, key, target server, value | the value stored; the caller's transaction carries the audit entry | Invalid, NotFound |
+| setWithin | inside a caller's transaction that already holds the settings state row: actor, key, target server, value | the value stored; the caller's transaction carries the audit entry | Invalid, NotFound |
+| initWithin | inside createBoard's transaction | the settings state row, created | Conflict (exists) |
 | list | actor, target server | every declared key with its kind, scope, apply mode, default and the stored value for that target (a secret value withheld) | Denied, Unavailable |
 
 Gate for `set` and `list`, through access-control v1: `board.administer`; or
@@ -89,7 +90,6 @@ Serves: ADV-001
 | reload fails | the previous snapshot stays in force |
 | access control errors | Denied |
 | audit fails | the `set` rolls back |
-| `seal` fails | the `set` rolls back |
 
 ## Multi-node invariants
 Serves: ADV-001
@@ -125,9 +125,9 @@ Serves: ADV-001
 - `declare` of a board-scoped connectivity setting → Invalid; the process stops.
 - `list` by the local operator of server A → only server A's connectivity settings; by a
   sysop → every key with its stored value, secret values withheld.
+- `list` with access control forced to error → Denied.
 - `set` with access control forced to error → Denied; nothing written; no audit entry.
 - `set` with audit forced to fail → rolled back.
-- `set` with `seal` forced to fail on a secret key → rolled back.
 - Server A sets K1, then server B sets K2 and reloads → B's snapshot holds K1's new value.
 - A restart-mode key changed → `restartNeeded` lists the affected server; after that server
   re-acquires its lease without restarting, it is still listed.

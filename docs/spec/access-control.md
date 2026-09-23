@@ -10,7 +10,8 @@ actions and who's-online, as a fixed table.
 
 ## Terms
 Serves: ADV-001
-As the glossary defines them: principal (sysop account, caller, local operator), permission.
+As the glossary defines them: principal (sysop account, caller, local operator, first-run
+operator), permission.
 
 ## Contracts
 Serves: ADV-001
@@ -28,13 +29,22 @@ Permissions this corpus declares, and who holds them:
 | Permission | Target | Holder |
 |---|---|---|
 | `board.administer` | none | a sysop account |
-| `board.create` | none | the local operator of the host running first-run setup |
+| `board.create` | none | the first-run operator: the principal whose administrator credential the database accepted through database-access v1 `openWith` |
 | `server.connectivity` | a server | the local operator of that server, and a sysop account |
-| `whos_online.view` | none | a caller, and a sysop account |
+| `whos_online.view` | none | a caller that sessions v1 vouches for as logged in, and a sysop account |
 | `audit.read` | none | a sysop account |
 
-Consumed: sessions v1, which vouches for a caller principal (a live session) and for whether
-it is logged in; accounts v1, which authenticates a sysop account principal.
+Consumed: sessions v1 and accounts v1, whose operations this document states as the
+contract until their providing features publish them:
+
+| Contract | Operation | Inputs | Outputs | Errors |
+|---|---|---|---|---|
+| sessions v1 | vouch | a session identifier | the caller reference, the surface, whether the session is logged in | NotFound (no such live session), Unavailable |
+| sessions v1 | displayName | a caller reference | the name to show | NotFound, Unavailable |
+| sessions v1 | mint | the surface | a session identifier, unpredictable and unique across servers, and a live session that is not yet logged in | Unavailable |
+| sessions v1 | end | a session identifier | none; idempotent; releases the node through cluster.nodes v1 | Unavailable |
+| sessions v1 | property | | a session ends when its surface's connection closes, when it logs out, or after the idle time sessions v1 owns; per-account concurrent sessions are bounded by sessions v1 before any node claim | |
+| accounts v1 | authenticate | the tool's login input | a sysop account principal, or none | Denied, Unavailable |
 
 ## Data model
 Serves: ADV-001
@@ -45,6 +55,9 @@ Serves: ADV-001
 | Input | Outcome |
 |---|---|
 | a permission the actor holds; the permission takes no target and none is given | allowed |
+| a permission the actor holds; the permission takes no target and a target is given | allowed; the target is ignored |
+| `whos_online.view` for a caller that sessions v1 vouches for but reports not logged in | Denied |
+| `board.create` for any principal but the first-run operator | Denied |
 | a permission the actor holds for server N; target server N | allowed |
 | a permission the actor holds for server N; target server M, or no target | Denied |
 | a permission the actor does not hold | Denied |
@@ -84,6 +97,8 @@ Serves: ADV-001
 - The local operator of server A asking `server.connectivity` for server B → Denied.
 - The local operator asking `server.connectivity` with no target → Denied.
 - The local operator asking `board.administer` → Denied.
+- A sysop account, a caller, or a local operator asking `board.create` → Denied.
+- A caller vouched for but not logged in asking `whos_online.view` → Denied.
 - A caller whose session sessions v1 cannot vouch for asking `whos_online.view` → Denied.
 - A caller asking `whos_online.view` with sessions v1 forced to error → Denied.
 - A sysop account with accounts v1 forced to error → Denied.
