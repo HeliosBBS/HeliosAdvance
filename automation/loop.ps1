@@ -89,7 +89,7 @@ function Set-Human([int]$number, [string]$reason) {
 function Read-State([int]$number) {
     $path = Join-Path $stateDir "$number.json"
     if (Test-Path $path) { Get-Content $path -Raw | ConvertFrom-Json }
-    else { [pscustomobject]@{ iterations = 0; failingTests = @(); changedFiles = @(); ticks = 0; notes = "" } }
+    else { [pscustomobject]@{ iterations = 0; failingTests = @(); changedFiles = @(); ticks = 0; notes = ""; reviewedHead = "" } }
 }
 
 function Write-State([int]$number, $state) {
@@ -185,9 +185,11 @@ Read the issue, then the learnings. Do exactly one of these, then stop:
 - If the issue's Plan section has no checklist, run the feature-plan skill and write the plan into the issue.
 - Otherwise run the feature-build skill for the first unticked task only.
 
-Rules: one task per session. Commit and push only when ``make check`` is green. Do not tick the
-box and do not dispatch a reviewer: the loop reviews your commit at Opus and ticks the box on a
-pass; findings come back to you as notes. Append a one-line learning to ``$wikiDir\Learnings.md``
+Rules: one task per session, the first unticked one, and never the one after it: if that task
+is already complete on the branch, commit nothing and stop with LOOP: DONE. Commit and push only
+when ``make check`` is green. Do not tick the box and do not dispatch a reviewer: the loop
+reviews everything committed since the last tick at Opus and ticks the box on a pass; findings
+come back to you as notes. Append a one-line learning to ``$wikiDir\Learnings.md``
 (commit and push there) if you learned a sign. Never edit features/, CONSTITUTION.md or the
 licence files. Never ask a question: if a task needs judgment the plan is wrong. Reference the
 issue as #$($issue.number) in commits; never write Closes until every box is ticked, then open
@@ -453,7 +455,12 @@ function Invoke-Iteration([int]$iteration) {
     finally { Pop-Location }
 
     $learnings = Get-Content (Join-Path $wikiDir "Learnings.md") -Raw
-    $base = (& git.exe -C $worktree rev-parse HEAD).Trim()
+    # The review covers everything committed since the last ticked task, across fix rounds
+    # and iterations, so a task is never reviewed one slice at a time.
+    $reviewed = Get-Field $state reviewedHead
+    $isAncestor = $false
+    if ($reviewed) { & git.exe -C $worktree merge-base --is-ancestor $reviewed HEAD 2>$null; $isAncestor = ($LASTEXITCODE -eq 0) }
+    $base = if ($isAncestor) { $reviewed } else { (& git.exe -C $worktree rev-parse HEAD).Trim() }
     Log "#${number}: running on $tier"
     $session, $marker, $detail = Invoke-Task $number $state.iterations $worktree $issue $learnings $state.notes $tier $tier $effort $log
 
@@ -483,7 +490,7 @@ function Invoke-Iteration([int]$iteration) {
         $round = 0
         while ($true) {
             $head = (& git.exe -C $worktree rev-parse HEAD).Trim()
-            if ($head -eq $base) { $marker = "HUMAN"; $detail = "the session reported DONE without a commit"; break }
+            if ($head -eq $base) { $marker = "HUMAN"; $detail = "the session reported DONE with nothing committed since the last ticked task"; break }
             $diff = (& git.exe -C $worktree diff "$base..$head") -join "`n"
             Log "#${number}: review $($round + 1) on opus"
             $review = Invoke-Session $worktree (Build-ReviewPrompt $issue (Get-TaskText $issue.body) $diff $hostile) "opus" "high" "$log.review$($round + 1)" "review"
@@ -495,7 +502,8 @@ function Invoke-Iteration([int]$iteration) {
                 Push-Location $repoDir
                 try { & work tick $number 1 "$commits; reviewed at opus after $round fix round(s): pass" | Out-Null; $ticked = $LASTEXITCODE -eq 0 }
                 finally { Pop-Location }
-                if (-not $ticked) { $marker = "HUMAN"; $detail = "the review passed but the box could not be ticked" }
+                if ($ticked) { $state | Add-Member -NotePropertyName reviewedHead -NotePropertyValue $head -Force }
+                else { $marker = "HUMAN"; $detail = "the review passed but the box could not be ticked" }
                 break
             }
             $round++
