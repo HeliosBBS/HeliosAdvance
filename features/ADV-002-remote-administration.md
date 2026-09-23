@@ -1,6 +1,6 @@
 # ADV-002 Remote administration
 
-Status: approved. Brainstorm record: https://github.com/HeliosBBS/HeliosDesign/discussions/3
+Status: approved. Brainstorm record: https://github.com/HeliosBBS/HeliosDesign/blob/main/records/ADV-002-brainstorm.md
 
 ## Purpose
 

@@ -1,6 +1,6 @@
 # ADV-001 Servers, nodes and one board
 
-Status: approved. Brainstorm record: https://github.com/HeliosBBS/HeliosDesign/discussions/1
+Status: approved. Brainstorm record: https://github.com/HeliosBBS/HeliosDesign/blob/main/records/ADV-001-brainstorm.md
 
 ## Purpose
 
