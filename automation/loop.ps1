@@ -224,16 +224,18 @@ function Invoke-Session([string]$dir, [string]$prompt, [string]$model, [string]$
     $env:WORK_IDENTITY = $identity
     $started = Get-Date
     # A build session may do anything in its worktree; a review session reads, diffs and
-    # runs tests, and cannot edit, so a reviewer never fixes what it should report.
-    $permissions = if ($mode -eq "review") {
-        @("--allowedTools", "Read,Grep,Glob,Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(go test:*),Bash(go vet:*)")
-    } else { @("--dangerously-skip-permissions") }
+    # runs tests, and cannot edit, so a reviewer never fixes what it should report. The
+    # argument list is one typed array: PowerShell collapses a one-element array coming out
+    # of an if/else to a string, and a splatted string passes nothing to a native command.
+    [string[]]$arguments = @("-p", "--model", $model, "--effort", $effort, "--output-format", "stream-json", "--verbose")
+    if ($mode -eq "review") {
+        $arguments += @("--allowedTools", "Read,Grep,Glob,Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(go test:*),Bash(go vet:*)")
+    } else { $arguments += "--dangerously-skip-permissions" }
     Push-Location $dir
     try {
         # The prompt goes in on stdin: it carries the whole issue body, and a Windows
         # command line is capped near 32 KB.
-        $lines = @($prompt | & claude -p --model $model --effort $effort @permissions --output-format stream-json --verbose 2>&1 |
-            ForEach-Object { "$_" } | Tee-Object -FilePath $logPath)
+        $lines = @($prompt | & claude @arguments 2>&1 | ForEach-Object { "$_" } | Tee-Object -FilePath $logPath)
     }
     finally { Pop-Location }
     $session = Read-Stream $lines
