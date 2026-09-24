@@ -22,8 +22,12 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   settings; our own menu items and colour scheme; a bottom help line giving the field's valid
   range; mouse support nice to have, not required. Shared by every TUI tool. Depends on:
   nothing.
-- **Sensitive data encrypted at rest**: passwords hashed, secrets and other sensitive fields
-  encrypted in the database, keys managed. Depends on: servers.
+- **Sensitive data encrypted at rest**: user passwords stored as a hash (the previous system
+  used Argon2id); a secret vault in the database that every server can read and decrypt,
+  holding network passwords and other sensitive values each server needs (the previous system
+  used a derived key-encryption key; ADV-001 already seals values under a board
+  key-encryption key that join carries to each server); other sensitive fields encrypted in
+  the database; keys managed. Depends on: servers.
 - **Scripting layer**: all BBS logic runs in theme scripts through a public `bbs.*` API with a
   deprecation contract; the engine has no BBS logic of its own. Depends on: servers,
   configuration.
@@ -37,7 +41,8 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   layer.
 - **Certificates**: `hadv-cert` (TUI only) generates self-signed certificates and installs
   supplied ones; TLS Telnet, HTTPS and SSH host keys draw on it. ACME is not spoken by the
-  engine; an ACME client uses `hadv-cert` to install what it obtained. Depends on:
+  engine; an ACME client uses `hadv-cert` to install what it obtained. Certificates reload
+  without a restart, so an ACME client can update them while the board runs. Depends on:
   configuration.
 - **Time zones and daylight saving**: times shown to callers and sysops follow daylight saving
   time where appropriate. Depends on: configuration.
@@ -79,7 +84,10 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   `_`, `=`, `+`, `"` or `'`; nor any username with `@` anywhere in it. Days to Preserve Former
   Handles: a separate retention period, sysop-configurable with a default of 30 days, during
   which a released or former handle, and its confusable lookalikes, is withheld from
-  re-registration by anyone. Depends on: accounts and login.
+  re-registration by anyone. Handle validation is one shared check, used wherever a handle is
+  set (sign-up, a username change, the sysop's editor): legality, reserved names, uniqueness,
+  and UTS #39 confusable skeletons, so look-alike handles cannot be registered. Depends on:
+  accounts and login.
 - **Username change**: a user can change their own username; how often is a sysop-configurable
   setting. The old username becomes a former handle. Depends on: reserved and former
   usernames.
@@ -113,8 +121,9 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   virtual deleted state, to comply with the EU GDPR; its posts, uploads and other data then
   show the placeholder [Deleted User]. Research whether and how the GDPR applies to the audit
   log and other logs. Depends on: accounts and login, RBAC.
-- **Second factor**: TOTP; passkeys where the surface allows; required per role; the initial
-  #1 Sysop enrols during first-run setup. Depends on: accounts, RBAC. Touches the Portal.
+- **Second factor**: TOTP (RFC 6238), with self-service enrolment in text mode and by QR code
+  on connections that support it; passkeys where the surface allows; required per role; the
+  initial #1 Sysop enrols during first-run setup. Depends on: accounts, RBAC. Touches the Portal.
 - **User profile and new-user questions**: the board stores, per account: deleted status, user
   number, handle, real name, company name, BBS name, email address, gender, birth date,
   address, location, zip code and phone number. Each question a new user is asked has a
