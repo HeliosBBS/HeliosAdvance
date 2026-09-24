@@ -89,8 +89,8 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   number, handle, real name, company name, BBS name, email address, gender, birth date,
   address, location, zip code and phone number. Each question a new user is asked has a
   setting in `hadv-config` and `hadv-config-gui` of No, Optional or Required: real name
-  (default Required, because FidoNet requires real names; force a multi-word name, default
-  Yes); company name (default No); email address (default Required); gender (No or Optional
+  (default Required; the sysop chooses, because a board that joins FidoNet must use real
+  names; force a multi-word name, default Yes); company name (default No); email address (default Required); gender (No or Optional
   only, default No; the accepted gender codes are configured elsewhere); birth date (default
   No); address and zip code (default No; US and international); location, such as city, state
   and country (default Optional; optionally require a comma, default No); phone number
