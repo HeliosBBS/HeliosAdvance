@@ -46,6 +46,12 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   configuration.
 - **Time zones and daylight saving**: times shown to callers and sysops follow daylight saving
   time where appropriate. Depends on: configuration.
+- **Attribute codes**: the colour and heart codes the board supports: WWIV, VBBS and VADV
+  heart codes, with WWIV taking precedence over VBBS and VADV when both are entered; PCBoard
+  (`@Xxx`) codes; Wildcat (`@xx@`) codes; Celerity (`|x`) codes; Renegade (`|xx`) codes;
+  Synchronet (CTRL) codes. When importing from VirtualNET-type networks, VBBS and VADV codes
+  are converted to correct ANSI; when importing from WWIV-type networks, WWIV codes are
+  converted to correct ANSI. Depends on: nothing.
 
 ## Callers
 
@@ -61,8 +67,9 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   lists and anything else where a regular user could see them or their activity, except from a
   role holding the permission to see private users; viewing a private profile shows only
   "This profile is private". A post or upload to a public area is the user's own affirmative
-  act and shows as usual. A user never sees someone they have blocked in who's-online (the who's-online contract takes
-  the viewer as an input for this). Lockout is board-wide policy with one implementation that
+  act and shows as usual. A user never sees someone they have blocked in who's-online, unless
+  they hold the permission to see everyone (the who's-online contract takes the viewer as an
+  input for this). Lockout is board-wide policy with one implementation that
   every surface's sign-in uses (Telnet, SSH, web, the Admin API), counted in the database so
   moving between servers or surfaces resets nothing. Account #1, always the main sysop
   account, is never locked; any other account locks after x failed attempts for x amount of
@@ -102,8 +109,12 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   cannot be deleted; editable. Guest: not signed in; cannot be deleted; editable. New User:
   baseline probationary access; can be deleted; fully editable. Account #1 is always the main
   sysop account and owner of the system. The Sysop role requires 2FA by default; the sysop may
-  turn that off for the role. Sysop and Co-Sysop hold the permission to see private users in
-  who's-online by default. Depends on: accounts and login.
+  turn that off for the role. Sysop and Co-Sysop hold the permission to see everyone in
+  who's-online, private or blocked, by default. Depends on: accounts and login.
+- **Who's online**: a list of who is currently online on the BBS; see classic BBSes for
+  examples. A user whose profile is private does not show up in who's online, and a user does
+  not see someone they have blocked. Sysop and Co-Sysop hold a permission to see everyone,
+  bypassing a private profile or a block. Depends on: role-based access control.
 - **Account deletion**: a user can delete their own account after a confirmation (typing
   something, or their second factor); account #1, the main sysop account, cannot delete
   itself. Deleting an account, whether the user, the Sysop or maintenance does it, puts it in
@@ -368,14 +379,14 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   BBSLIST.* and AREALIST.* files. Network roles NC, RC, AC and SC. ADD and DROP SUB requests
   and SUB CREATE. Flow reports. ORIGIN.ID. Being a hub for other nodes, which log in by FTP or
   FTPS as `<nodenumber>@~<networkname>`. The developer will provide a full specification.
-  Depends on: mail networks, file bases, FTP and FTPS server.
+  Depends on: mail networks, file bases, FTP and FTPS server, attribute codes.
 - **WWIV networks (`hadv-ww4`)**: the WWIVnet packet specification. Address format
   `@node.netname`; multiple WWIVnet networks, each with its own node number. Sub hosting: the
   host and subscriber model, add and drop sub requests, a host designated per sub. BBSLIST,
   CONNECT and CALLOUT data maintained and distributed. Packet transport by BinkP
   through `hadv-service`, with per-link passwords. WWIV email routed inbound and outbound to local
   users. Heart codes translated on import and export (see attribute codes). Depends on: mail
-  networks.
+  networks, attribute codes.
 - **Usenet (`hadv-nntp`)**: an NNTP client and tosser for Usenet. Multiple NNTP networks (such as "Usenet"
   and "InterNetNews"), each with several Usenet servers for backfill and one designated for
   sending posts. Nothing is imported automatically: the sysop sets up each newsgroup as a
@@ -461,5 +472,5 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
 
 ## Not yet described
 
-Doors (through the HeliosDoors hosting protocol), attribute codes (colour and heart codes),
-node chat, and everything else the developer adds as it comes up.
+Doors (through the HeliosDoors hosting protocol), node chat, and everything else the developer
+adds as it comes up.
