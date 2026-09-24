@@ -330,12 +330,6 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   operation: per-link read-only echoes and area passthrough. Per-link flow reports: packets
   and bytes in and out, dupes rejected, last successful session. Depends on: mail networks,
   file bases.
-- **VirtualNET networks (`hadv-vnet`)**: first-class support for every feature: netmail
-  inbound and outbound, posts and file areas. Multiple VirtualNET networks. Advanced Update of
-  BBSLIST.* and AREALIST.* files. Network roles NC, RC, AC and SC. ADD and DROP SUB requests
-  and SUB CREATE. Flow reports. ORIGIN.ID. Being a hub for other nodes, which log in by FTP or
-  FTPS as `<nodenumber>@~<networkname>`. The developer will provide a full specification.
-  Depends on: mail networks, file bases, FTP and FTPS server.
 - **QWK BBS networks (`hadv-qwk`)**: several QWK networks, each with its settings and their
   defaults: enabled (disabled); support gating (no); network name, hub system ID, hub address
   (IP or FQDN), QWK username and QWK password (blank); archive format, from the list in
@@ -358,6 +352,23 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   and GOODBYE files included. REP import validates the packet's BBS ID, rejects foreign
   packets and handles stale pointers. Depends on: message bases, private messages, file
   transfer on classic connections.
+- **FTP and FTPS server (uploading and downloading files)**: a secure FTP server in
+  `hadv-service`, supporting standard FTP and secure FTPS (SSL/TLS). Port binding and
+  listening addresses configurable; by default the normal ports, TCP/21 for FTP and TCP/990
+  for FTPS, bound to all addresses. Structured logging and monitoring of every access attempt.
+  Integrated with RBAC. A global enable and disable, off by default. Session timeout and
+  inactivity handling. QWK and QWK network file transfers: special files generated per user,
+  and an uploaded QWK REP packet processed by the mail tosser. Maximum simultaneous
+  connections configurable, default 100. Virtual accounts: special access accounts whose
+  username and password are stored outside the user table, such as
+  `<nodenumber>@~<networkname>`. Depends on: QWK offline mail, QWK BBS networks, sensitive
+  data encrypted at rest.
+- **VirtualNET networks (`hadv-vnet`)**: first-class support for every feature: netmail
+  inbound and outbound, posts and file areas. Multiple VirtualNET networks. Advanced Update of
+  BBSLIST.* and AREALIST.* files. Network roles NC, RC, AC and SC. ADD and DROP SUB requests
+  and SUB CREATE. Flow reports. ORIGIN.ID. Being a hub for other nodes, which log in by FTP or
+  FTPS as `<nodenumber>@~<networkname>`. The developer will provide a full specification.
+  Depends on: mail networks, file bases, FTP and FTPS server.
 - **WWIV networks (`hadv-ww4`)**: the WWIVnet packet specification. Address format
   `@node.netname`; multiple WWIVnet networks, each with its own node number. Sub hosting: the
   host and subscriber model, add and drop sub requests, a host designated per sub. BBSLIST,
@@ -451,4 +462,4 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
 ## Not yet described
 
 Doors (through the HeliosDoors hosting protocol), attribute codes (colour and heart codes),
-an FTP and FTPS server in `hadv-service`, node chat, and everything else the developer adds as it comes up.
+node chat, and everything else the developer adds as it comes up.
