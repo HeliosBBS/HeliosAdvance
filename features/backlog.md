@@ -176,6 +176,17 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   carried over a WebSocket. The screen is not locked to a fixed 80x25 size that looks tiny on a
   2K or 4K monitor: the font scales to take up more of the page without breaking the aspect
   ratio, and rescales dynamically when the window is resized. Depends on: web caller.
+- **Terminal capabilities**: terminal capability negotiation shared by Telnet, SSH and
+  WebSocket: CP437 or UTF-8, colour tier, graphics, mouse, fonts and screen size. xterm-256
+  and 24-bit colour in the theme colour model, with automatic downgrade to 16 colours; themes
+  declare the tier they were drawn for. SyncTERM font-loading sequences (PC and Amiga fonts),
+  emitted only when the client announces support. Sixel inline graphics where negotiated
+  (file previews, art gallery, TOTP enrolment QR), falling back to nothing, never to garbage.
+  Mouse click regions for lightbar menus and file lists where the client reports mouse
+  support. Baud-rate emulation as a user preference: off, 2400, 9600, 14400, 28800 or 57600,
+  default off. ANSI music (`ESC[M` MML) passed through where supported, with a per-user
+  opt-out, and stripped where not supported, since to most terminals `ESC[M` means delete
+  line. Depends on: SSH caller, terminal-in-browser rendering.
 - **Modern theme**: rich HTML on the web and a lightbar ANSI system on the terminal; shipped;
   the fallback. Depends on: theme packs, Telnet caller, web caller.
 - **Classic theme**: strictly text-based; shipped; the web server renders it by conversion.
@@ -398,7 +409,8 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   (yes); private profile (yes, as accounts and login describes). Some of these may be better
   stored in a separate table linked to the user. Depends on: languages, time zones and
   daylight saving, theme packs, message bases, private messages, file transfer on classic
-  connections, SMTP client, full-screen text editor, basic line text editor.
+  connections, SMTP client, full-screen text editor, basic line text editor, terminal
+  capabilities.
 - **Voting booth**: a voting booth that allows polling. A poll is a question with up to 10
   replies and an optional write-in, single-choice or multiple-choice (pick N); a poll can be
   made required at login. RBAC decides who can create polls, set one required, vote, see the
