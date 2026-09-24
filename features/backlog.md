@@ -422,6 +422,10 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   until the poll closes, default off. Result visibility: after voting, after close or always,
   default after voting. A voting booth menu; configurable in `hadv-config`, `hadv-config-gui`
   and inside the BBS. Depends on: role-based access control.
+- **ANSI art gallery**: a gallery driven by SAUCE metadata: artist pages, pack browsing and
+  group credits. Art renders to the terminal, to HTML and to PNG (for link previews). An
+  optional seeded gallery area on a fresh install points at a public art-pack archive.
+  Depends on: file bases, external archivers, terminal capabilities, first-run setup.
 
 ## Mail networks
 
