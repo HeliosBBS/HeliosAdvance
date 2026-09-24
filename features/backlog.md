@@ -221,6 +221,20 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   that replaces placeholders such as `{BBSNAME}` and the theme's colour macros. Depends on:
   theme packs, classic text-mode interface, accounts and login. Touches every repository in the
   estate.
+- **Doors**: the board offers door games through BBSLink, DoorParty and Helios Doors
+  (`hadv-doors`); the board never runs a door itself. Helios Doors is a separate,
+  BBS-agnostic service, on the same hardware or its own; the board can use several
+  `hadv-doors` instances, each separate, with no federation. The board registers with each
+  instance and talks to it over the door hosting protocol: the board keeps the caller's
+  connection and relays the game, passes the chosen game and only the player details its drop
+  file needs (never a password), identifies a player by board and account number rather than
+  handle, tells the instance when an account is permanently deleted, and turns the instance's
+  status codes (full, all nodes busy and so on) into messages for the caller. BBSLink and
+  DoorParty credentials live in the secret vault. `hadv-config` and `hadv-config-gui` can
+  configure an instance. Web callers play legacy doors through terminal-in-browser rendering;
+  doors built with the Door Kit are also drawn as HTML for web callers. Depends on: terminal
+  capabilities, account deletion, languages, sensitive data encrypted at rest; blocked on the
+  door hosting protocol (HeliosDoors).
 
 ## Operating the board
 
@@ -604,6 +618,6 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
 
 ## Not yet described
 
-Doors (through the HeliosDoors hosting protocol), node chat, storage (one storage registry
-shared by file areas, message attachments and more), social media features (the reaction model
-and the follow graph), and everything else the developer adds as it comes up.
+Node chat, storage (one storage registry shared by file areas, message attachments and more),
+social media features (the reaction model and the follow graph), and everything else the
+developer adds as it comes up.
