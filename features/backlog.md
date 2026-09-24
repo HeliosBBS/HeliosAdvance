@@ -160,8 +160,9 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   locally on the server) takes a fresh install to a running board:
   sysop account with its second factor enrolled, listeners, database, certificates. Depends on:
   servers, certificates, RBAC, second factor.
-- **Installation**: Inno Setup on Windows, WinGet wrapping it, RPM and DEB on Linux, a
-  container image; the same result on every target. Depends on: service lifecycle.
+- **Installation**: Inno Setup (`setup.exe`) on Windows, WinGet wrapping it, RPM and DEB on
+  Linux, a container image built from a Dockerfile; the same result on every target. Depends
+  on: service lifecycle.
 - **Auto-update**: a server updates itself from the published releases, verifying the
   release's signature and build-provenance attestation against the project's publishing
   identity before anything is applied (supply-chain protection built on the git and release
