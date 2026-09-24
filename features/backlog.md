@@ -67,6 +67,17 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   adding an exempt source, warns loudly and needs the sysop's confirmation. The next
   successful sign-in shows how many failures there were and from where. Depends on: scripting
   layer, Telnet caller.
+- **Reserved and former usernames**: nobody can register these usernames: `!@-REMOTE-@!`,
+  `!@-NETWORK-@!`, `GUEST`, `NEW`, `SIGNUP`, `DEMO`, `SYSOP`, `W`, `WANDERER`, `ANONYMOUS`,
+  `hostmaster`, `postmaster`, `abuse`, `webmaster`, `admin`, `administrator`, `soc`; nor any
+  username starting with `~`, `` ` ``, `!`, `@`, `#`, `$`, `%`, `^`, `&`, `*`, `(`, `)`, `-`,
+  `_`, `=`, `+`, `"` or `'`; nor any username with `@` anywhere in it. Days to Preserve Former
+  Handles: a separate retention period, sysop-configurable with a default of 30 days, during
+  which a released or former handle, and its confusable lookalikes, is withheld from
+  re-registration by anyone. Depends on: accounts and login.
+- **Username change**: a user can change their own username; how often is a sysop-configurable
+  setting. The old username becomes a former handle. Depends on: reserved and former
+  usernames.
 - **Role-based access control**: roles carry permissions and configuration (upload/download
   ratio, whether 2FA is required, and the like). Every gate fails closed; every operator action
   is audited. Seeded roles, by fixed ID because names are editable: 1 Sysop, 2 Co-Sysop,
@@ -80,6 +91,23 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   sysop account and owner of the system. The Sysop role requires 2FA by default; the sysop may
   turn that off for the role. Sysop and Co-Sysop hold the permission to see private users in
   who's-online by default. Depends on: accounts and login.
+- **Account deletion**: a user can delete their own account after a confirmation (typing
+  something, or their second factor); account #1, the main sysop account, cannot delete
+  itself. Deleting an account, whether the user, the Sysop or maintenance does it, puts it in
+  a virtual deleted state, like a recycle bin, for a period configurable in `hadv-config` and
+  `hadv-config-gui` up to a ceiling of 30 days, before it is deleted permanently. Maintenance
+  deletes an account that has been inactive for longer than its role's Maximum Days of User
+  Inactivity, a setting every role carries and the sysop can change on it: the Sysop role
+  defaults to unlimited, Co-Sysop to 365 days, User to 180, New User to 30, and a new role to
+  180. Account #1, the main sysop account, is never deleted for inactivity. While in the
+  virtual deleted state the account is hidden, blocked from login and absent from the user list; its
+  username and email address cannot be reused by a new user; the Sysop or a Co-Sysop can
+  restore it. When the account is deleted permanently, any messages in its mailbox are
+  deleted and cannot be restored, and its username and email address may be reused, subject
+  to the former-handle period. The Sysop can delete an account permanently straight from the
+  virtual deleted state, to comply with the EU GDPR; its posts, uploads and other data then
+  show the placeholder [Deleted User]. Research whether and how the GDPR applies to the audit
+  log and other logs. Depends on: accounts and login, RBAC.
 - **Second factor**: TOTP; passkeys where the surface allows; required per role; the initial
   #1 Sysop enrols during first-run setup. Depends on: accounts, RBAC. Touches the Portal.
 - **Telnet over TLS caller**: the Telnet experience over a TLS-wrapped listener. Default port
@@ -180,9 +208,11 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
 - **Conferences**: message and file bases live under conferences; a conference's permissions
   gate every base beneath it (no permission at the conference means none on any base below),
   and each base adds its own. Depends on: RBAC.
-- **Message bases**: public message areas under conferences. Depends on: conferences.
-- **File bases**: file areas under conferences. Depends on: conferences.
-- **Private messages**: user-to-user mail on the board. Depends on: accounts, RBAC.
+- **Message bases**: public message areas under conferences. Depends on: conferences, account
+  deletion.
+- **File bases**: file areas under conferences. Depends on: conferences, account deletion.
+- **Private messages**: user-to-user mail on the board. Depends on: accounts, RBAC, account
+  deletion.
 - **File transfer on classic connections**: upload and download protocols over Telnet and SSH
   sessions. Depends on: Telnet and SSH callers, file bases.
 - **Bulk file import**: `hadv-fileimport` loads files into the board's file bases from the
