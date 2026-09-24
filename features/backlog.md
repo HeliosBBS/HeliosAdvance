@@ -8,7 +8,14 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
 ## Foundations
 
 - **Service lifecycle**: `hadv-service` runs as a Windows service or a daemon; starts, stops,
-  reloads, reports health. Depends on: servers, nodes and one board.
+  reloads, reports health. Liveness and readiness are separate: a server is ready when ADV-001's
+  health report says it is healthy and its migrations are applied, and only then does it tell
+  systemd or the Windows service manager that it is ready. Logs go to stdout by default; file
+  logging with rotation is an explicit option, for the Windows service. Depends on: servers,
+  nodes and one board.
+- **IPv4 and IPv6**: every listener and every outbound connection works over IPv4 and IPv6.
+  Every source count, ban, limit and allow list treats an IPv6 source by its prefix, not by a
+  single address. Depends on: servers.
 - **Languages**: every string the whole estate uses lives in one TOML file per language, at
   `lang/<code>/<code>.toml` (for example `lang/en-us/en-us.toml`), or in the database; which of
   the two, and how every server gets them, is decided in the brainstorm, not assumed. Each file
@@ -39,7 +46,9 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   explicit choice. Runs on the server or on a separate computer for remote administration
   (the board hosted at a cloud provider, configured from the sysop's home computer as if it
   were local). Configuration changes are held until applied. Sign-in by the Sysop role only;
-  no one can grant that permission to another role. Depends on: servers, remote
+  no one can grant that permission to another role. Each server's database connection pool
+  size is a setting, and the setting notes that every server's pool counts against the
+  database's connection limit. Depends on: servers, remote
   administration, classic text-mode interface.
 - **Sensitive data encrypted at rest**: user passwords stored as a hash (the previous system
   used Argon2id); a secret vault in the database that every server can read and decrypt,
@@ -48,7 +57,8 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   key-encryption key that join carries to each server); other sensitive fields encrypted in
   the database; keys managed. Depends on: servers.
 - **Scripting layer**: all BBS logic runs in theme scripts through a public `bbs.*` API with a
-  deprecation contract; the engine has no BBS logic of its own. Depends on: servers,
+  deprecation contract; the engine has no BBS logic of its own. Every script runs in a sandbox
+  with ceilings on instructions, memory and wall-clock time. Depends on: servers,
   configuration.
 - **Theme packs**: scripts plus terminal text and graphics plus web code, in one pack. A
   board installs several; each user picks the one they use, and a new user starts on the pack
@@ -57,8 +67,16 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   supported if edited; a sysop can disable it from selection and flag another pack as the
   default. Packs carry metadata and versioning, and are installed and updated through
   `hadv-config` and `hadv-config-gui`. Where theme files live (database or disk, and how every
-  server gets them) is decided here, not assumed. Depends on: scripting
-  layer.
+  server gets them) is decided here, not assumed. A pack's drawn assets (ANSI and ASCII
+  screens, menus, art; not the language strings) may come in more than one character set, and
+  the user gets the variant for their character set: the user's set first, then the pack's
+  default set, then the default theme. A pack's metadata names the minimum engine version it
+  needs, and installing refuses a pack that needs a newer engine. Installing checks the pack,
+  reporting missing assets and listing what falls back to the default theme. The Sysop can use
+  a pack before it is offered to users, to preview it. A pack does not assume 80x25: 132
+  columns and tall terminals are part of the theme contract. When an update replaces a shipped
+  theme, a file the sysop edited is found by comparing it with the shipped file's hash, and the
+  sysop's copy is set aside and the sysop told. Depends on: scripting layer.
 - **Certificates**: `hadv-cert` (TUI only) generates self-signed certificates and installs
   supplied ones; TLS Telnet, HTTPS and SSH host keys draw on it. ACME is not spoken by the
   engine; an ACME client uses `hadv-cert` to install what it obtained. Certificates reload
@@ -70,12 +88,24 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   `hadv-config-gui`; they default to secure settings. Depends on: configuration.
 - **Time zones and daylight saving**: times shown to callers and sysops follow daylight saving
   time where appropriate. Depends on: configuration.
-- **Scheduled maintenance**: jobs the board runs on a schedule, once for the whole board.
-  Jobs other entries already hand it: the daily statistics rollover, deleting accounts past
-  their role's Maximum Days of User Inactivity, permanently deleting accounts whose time in the
-  virtual deleted state is up, the re-scan sweep of quarantined uploads, and message base
-  packing and renumbering. Depends on: servers, nodes and one board; time zones and daylight
-  saving.
+- **Event scheduler**: an event scheduler, like cron, that runs built-in actions and external
+  programs and scripts on a schedule. Each event is pinned to any server (one server picks
+  itself to run it and locks the others out; done when that server has run it), all servers
+  (done when every server has run it) or a specific server; default all servers. An event has a
+  maximum runtime, after which it is killed; runs a missed event, default yes; retries on
+  failure, off or N retries with backoff, default off; and has an overlap policy for when the
+  previous run is still going, skip, queue or kill the previous, default skip. Events can be
+  disabled without being deleted and run now from the console. Run history (last run,
+  duration, exit code, the server that ran it) is kept for N days. An event that runs an
+  external program is created only in `hadv-config`, and audited. A midnight repeated by a
+  daylight-saving change never runs an event twice. Daily Maintenance is event 1: it cannot be
+  deleted or edited, runs at midnight local time once a day on any server, runs if missed, and
+  resets the user and BBS statistics and does anything else that must be done daily. Jobs
+  other entries already hand it: the daily statistics rollover, deleting accounts past their
+  role's Maximum Days of User Inactivity, permanently deleting accounts whose time in the
+  virtual deleted state is up, the re-scan sweep of quarantined uploads, message base packing
+  and renumbering, and mail polling. Depends on: servers, nodes and one board; time zones and
+  daylight saving.
 - **Attribute codes**: the colour and heart codes the board supports: WWIV, VBBS and VADV
   heart codes, with WWIV taking precedence over VBBS and VADV when both are entered; PCBoard
   (`@Xxx`) codes; Wildcat (`@xx@`) codes; Celerity (`|x`) codes; Renegade (`|xx`) codes;
@@ -178,7 +208,7 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   to the former-handle period. The Sysop can delete an account permanently straight from the
   virtual deleted state, to comply with the EU GDPR; its posts, uploads and other data then
   show the placeholder [Deleted User]. Research whether and how the GDPR applies to the audit
-  log and other logs. Depends on: accounts and login, RBAC, scheduled maintenance.
+  log and other logs. Depends on: accounts and login, RBAC, event scheduler.
 - **Second factor**: TOTP (RFC 6238), with self-service enrolment in text mode and by QR code
   on connections that support it; passkeys where the surface allows; required per role; the
   initial #1 Sysop enrols during first-run setup. Depends on: accounts, RBAC. Touches the Portal.
@@ -226,9 +256,12 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   opt-out, and stripped where not supported, since to most terminals `ESC[M` means delete
   line. Depends on: terminal negotiation, SSH caller, terminal-in-browser rendering.
 - **Modern theme**: rich HTML on the web and a lightbar ANSI system on the terminal; shipped;
-  the fallback. Depends on: theme packs, Telnet caller, web caller.
+  the fallback. Its web side takes advantage of modern web design and has a modern social-media
+  feel, while still reaching everything the board offers. Depends on: theme packs, Telnet
+  caller, web caller.
 - **Classic theme**: strictly text-based; shipped; the web server renders it by conversion.
-  Depends on: theme packs, Telnet caller, terminal-in-browser rendering.
+  The sysop can delete it, and reinstall it from the release. Depends on: theme packs, Telnet
+  caller, terminal-in-browser rendering.
 - **Proxies in front of the board**: PROXY protocol v1 and v2, `X-Forwarded-For`,
   `X-Real-IP`, `Forwarded`; honoured only from a trusted proxy list so the caller's address
   cannot be forged. Depends on: Telnet, SSH and web callers.
@@ -243,9 +276,10 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   status codes (full, all nodes busy and so on) into messages for the caller. BBSLink and
   DoorParty credentials live in the secret vault. `hadv-config` and `hadv-config-gui` can
   configure an instance. Web callers play legacy doors through terminal-in-browser rendering;
-  doors built with the Door Kit are also drawn as HTML for web callers. Depends on: terminal
-  capabilities, account deletion, languages, sensitive data encrypted at rest; blocked on the
-  door hosting protocol (HeliosDoors).
+  doors built with the Door Kit are also drawn as HTML for web callers. Each door can have a
+  nightly maintenance hook, run by the event scheduler. Depends on: terminal capabilities,
+  account deletion, languages, sensitive data encrypted at rest, event scheduler; blocked on
+  the door hosting protocol (HeliosDoors).
 
 ## Operating the board
 
@@ -257,8 +291,18 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   node on which server, and their activity; it spawns the user editor. Depends on: remote
   administration, classic text-mode interface.
 - **Taskview**: in the WFC, see running tasks, with progress if the task supports it, and
-  cancel a task if the task supports it, much as Nutanix Prism Central does. Depends on:
-  Waiting-for-Caller console, scheduled maintenance.
+  cancel a task if the task supports it, much as Nutanix Prism Central does. It is open to
+  every part of the BBS, not only the event scheduler: a background virus scan, mail tossing
+  and any other background task show up in it too. Depends on: Waiting-for-Caller console.
+- **Turning services on and off**: each service (Telnet, SSH, the web, FTP and the rest) has an
+  on or off setting per server, which is its state when the server starts. `hadv-config` and
+  the WFC consoles change that same setting; there is no temporary state in the console and no
+  board-wide setting. "All servers" is a bulk action in both, not a stored setting. From the
+  console, turning a service off needs no extra sign-in and turning it on needs step-up (the
+  Sysop's password and second factor); both are audited. Turning the web off never affects the
+  Admin API. The sysop guide says to point DNS or a load balancer for a service only at the
+  servers that run it. Depends on: configuration, Waiting-for-Caller console; blocked on an
+  amendment to ADV-002, whose console tokens change no settings.
 - **User editor**: `hadv-useredit` and `hadv-useredit-gui`, spawned from the console or run
   alone. Depends on: RBAC, remote administration.
 - **Server join by pairing code**: a sysop adds a server to the board: on the existing server,
@@ -282,11 +326,22 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
 - **Installation**: Inno Setup (`setup.exe`) on Windows, WinGet wrapping it, RPM and DEB on
   Linux, a container image built from a Dockerfile; the same result on every target. Depends
   on: service lifecycle.
+- **Database upgrades**: the database is backed up before every migration, by default; the
+  sysop may skip the backup, with a loud warning. Restoring that backup to test it is
+  configurable. After an install or an upgrade the schema is checked against what the
+  migrations should have produced. Depends on: servers, nodes and one board.
 - **Auto-update**: a server updates itself from the published releases, verifying the
   release's signature and build-provenance attestation against the project's publishing
   identity before anything is applied (supply-chain protection built on the git and release
   infrastructure), rolling across a multi-server board one server at a time within the
-  one-version skew rule. Depends on: installation, servers, nodes and one board.
+  one-version skew rule. Depends on: installation, servers, nodes and one board, database
+  upgrades.
+- **Configuration export and import**: the board's configuration (settings, areas, roles,
+  networks; never secrets) exports as one file that diffs cleanly. An import lands as pending
+  changes in the configuration tools, so the dry run is the pending list and applying it is the
+  normal apply, with the same checks and loud warnings as a change typed by hand; Sysop only.
+  An import lists the secrets to enter again. For now, an import goes to the same board or a
+  fresh one. Depends on: configuration.
 - **Fault-tolerant database, documented**: a sysop guide chapter on running the board behind a
   PostgreSQL proxy that provides failover and pooling (Pgpool-II, or PgBouncer with Patroni
   and HAProxy); the engine needs nothing special. The proxy must pool in session mode: the
@@ -349,7 +404,7 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   initial setup and freely editable or deletable afterwards: Announcement (read by Sysop,
   Co-Sysop, User, New User, Guest; required reading, yes) and General Discussion (read by Sysop,
   Co-Sysop, User, New User, Guest; post by Sysop, Co-Sysop, User, New User; moderate by Sysop,
-  Co-Sysop). Depends on: conferences, account deletion, scheduled maintenance.
+  Co-Sysop). Depends on: conferences, account deletion, event scheduler.
 - **File bases**: file areas under conferences. Storage is a separate entry, since more than
   file areas need it. Local directory and file paths are supported; the architecture must
   handle availability across servers: a file local to one server may need to be transferred
@@ -441,7 +496,7 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   sit alongside today's counters; the daily rollover is owned by daily maintenance. Statistics
   export as CSV or JSON from the Admin API and the console. A histogram of the busiest hours
   and days, and the peak concurrent sessions with the time they occurred. Depends on: user
-  statistics, Waiting-for-Caller console, scheduled maintenance.
+  statistics, Waiting-for-Caller console, event scheduler.
 - **User preferences**: each user sets, with its default: language and time zone (the
   board's); short date format such as MM/DD/YYYY, and time format, 12 or 24 hour (the board's);
   theme (the default theme set in `hadv-config` and `hadv-config-gui`); terminal type:
@@ -619,7 +674,7 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   cannot be scanned: an automatic re-scan sweep periodically re-submits quarantined uploads
   and releases each on a clean result, with no human queue entry. Depends on: content
   moderation, file transfer on classic connections, mail networks, SMTP server, external
-  archivers, scheduled maintenance.
+  archivers, event scheduler.
 - **Bans, suspensions and appeals**: ban user, from the moderation queue, offers a permanent
   ban or a temporary suspension (such as 24 hours, 7 days or 30 days) with automatic
   restoration. A shadow-ban ("silence") sits between suspension and ban: the user sees their
@@ -634,8 +689,9 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   otherwise-eligible moderator has a conflict of interest with it (for example, the only
   moderator is the one who applied the ban). Depends on: content moderation, mail networks.
 - **Sysop notification triggers**: the Sysop is notified of a new user, an upload awaiting
-  approval, feedback received and an appeal filed, in the inbox and optionally by email.
-  Depends on: bans, suspensions and appeals, SMTP client.
+  approval, feedback received, an appeal filed and a scheduled event that failed (with the tail
+  of its output), in the inbox and optionally by email. Depends on: bans, suspensions and
+  appeals, SMTP client, event scheduler.
 
 ## Chat
 
