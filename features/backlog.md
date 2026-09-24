@@ -247,7 +247,7 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   inbound and outbound, posts and file areas. Multiple VirtualNET networks. Advanced Update of
   BBSLIST.* and AREALIST.* files. Network roles NC, RC, AC and SC. ADD and DROP SUB requests
   and SUB CREATE. Flow reports. ORIGIN.ID. Being a hub for other nodes, which log in by FTP or
-  SFTP as `<nodenumber>@~<networkname>`. The developer will provide a full specification.
+  FTPS as `<nodenumber>@~<networkname>`. The developer will provide a full specification.
   Depends on: mail networks, file bases, FTP and FTPS server.
 - **QWK BBS networks (`hadv-qwk`)**: several QWK networks, each with its settings and their
   defaults: enabled (disabled); support gating (no); network name, hub system ID, hub address
