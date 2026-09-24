@@ -49,9 +49,12 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   TCP/23, default binding all addresses, both changeable in `hadv-config`. Depends on:
   servers, scripting layer, theme packs. Touches the load tester.
 - **Accounts and login**: sign-up, login, sessions across servers, lockouts; a second factor
-  when the account's role requires it. A user may set themselves private and then does not
-  appear in who's-online except to a role holding the permission to see private users; a
-  user never sees someone they have blocked in who's-online (the who's-online contract takes
+  when the account's role requires it. A user's profile is private by default, and they may
+  make it public: a private user is hidden from search, profile views, who's-online, activity
+  lists and anything else where a regular user could see them or their activity, except from a
+  role holding the permission to see private users; viewing a private profile shows only
+  "This profile is private". A post or upload to a public area is the user's own affirmative
+  act and shows as usual. A user never sees someone they have blocked in who's-online (the who's-online contract takes
   the viewer as an input for this). Lockout is board-wide policy with one implementation that
   every surface's sign-in uses (Telnet, SSH, web, the Admin API), counted in the database so
   moving between servers or surfaces resets nothing. Account #1, always the main sysop
@@ -82,6 +85,18 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   who's-online by default. Depends on: accounts and login.
 - **Second factor**: TOTP; passkeys where the surface allows; required per role; the initial
   #1 Sysop enrols during first-run setup. Depends on: accounts, RBAC. Touches the Portal.
+- **User profile and new-user questions**: the board stores, per account: deleted status, user
+  number, handle, real name, company name, BBS name, email address, gender, birth date,
+  address, location, zip code and phone number. Each question a new user is asked has a
+  setting in `hadv-config` and `hadv-config-gui` of No, Optional or Required: real name
+  (default Required, because FidoNet requires real names; force a multi-word name, default
+  Yes); company name (default No); email address (default Required); gender (No or Optional
+  only, default No; the accepted gender codes are configured elsewhere); birth date (default
+  No); address and zip code (default No; US and international); location, such as city, state
+  and country (default Optional; optionally require a comma, default No); phone number
+  (default No; US and international). A feature that needs a field the user has not given
+  (real name, email address, gender, age) cannot be used by that user. Depends on: accounts
+  and login.
 - **Telnet over TLS caller**: the Telnet experience over a TLS-wrapped listener. Default port
   TCP/992, default binding all addresses, both changeable in `hadv-config`. Depends on:
   certificates, Telnet caller.
@@ -177,8 +192,33 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   sessions. Depends on: Telnet and SSH callers, file bases.
 - **Bulk file import**: `hadv-fileimport` loads files into the board's file bases from the
   command line. Depends on: Admin API, file bases.
+- **User statistics**: per account: first on, last on, logons today and in total, posts today
+  and in total, netmail and email sent and received today and in total, netmail and email sent
+  to sysops in total, uploads and upload bytes in total, downloads and download bytes in total.
+  Depends on: accounts and login, message bases, private messages, file bases.
+- **User preferences**: each user sets, with its default: language and time zone (the
+  board's); short date format such as MM/DD/YYYY, and time format, 12 or 24 hour (the board's);
+  theme (the default theme set in `hadv-config` and `hadv-config-gui`); terminal type:
+  auto-detect, extended ASCII, ANSI or RIP (auto-detect); colour: auto-detect, yes or no
+  (auto-detect); screen length and width: auto-detect or a number (auto-detect); expert mode,
+  menus hidden unless `?` is pressed (no); pause at the end of each screen (yes); forward all
+  netmail and email to the external email address (no); clear screen between messages (no);
+  ask for a new message scan (no); remember the current message area (no) and file area (no);
+  default download protocol, from the protocols the system defines (ZModem); hang up after a
+  file transfer (no); editor: full-screen or line, on classic connections only (full-screen);
+  message reading order: forward, reverse or threaded (forward); show signature on posts
+  (yes); private profile (yes, as accounts and login describes). Some of these may be better
+  stored in a separate table linked to the user. Depends on: languages, time zones and
+  daylight saving, theme packs, message bases, private messages, file transfer on classic
+  connections.
+- **QWK network accounts**: an account flagged as a QWK network account (default no) is the
+  account another BBS on a QWK BBS network, such as DoveNET, uses; it is taken straight to the
+  QWK menu and logged off when it quits that menu. A setting, default No, has sign-up ask
+  whether the new account is a QWK network account, and a yes prompts for its BBS name.
+  Depends on: user profile and new-user questions, QWK BBS networks.
 
 ## Not yet described
 
-Doors (through the HeliosDoors hosting protocol), mail networks (VirtualNET, FTN), node chat,
-and everything else the developer adds as it comes up.
+Doors (through the HeliosDoors hosting protocol), mail networks (VirtualNET, FTN), QWK offline
+mail (a user downloads their messages and reads them offline), QWK BBS networks (such as
+DoveNET), node chat, and everything else the developer adds as it comes up.
