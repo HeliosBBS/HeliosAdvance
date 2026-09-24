@@ -260,10 +260,73 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
 
 - **Conferences**: message and file bases live under conferences; a conference's permissions
   gate every base beneath it (no permission at the conference means none on any base below),
-  and each base adds its own. Depends on: RBAC.
-- **Message bases**: public message areas under conferences. Depends on: conferences, account
+  and each base adds its own. Message conferences and file conferences share one shape. The
+  sysop can easily move areas between conferences in `hadv-config` and `hadv-config-gui`.
+  Restrictions: the roles that can access (default Sysop, Co-Sysop, User, New User, Guest);
+  required minimum and maximum age (off, or an age); required genders (off, or a selection);
+  required terminal type (off, or a selection). Duplicate checking, by a hash of the message or
+  file searched across every area in the conference: off, or the number of duplicates allowed;
+  default off. The initial conference is General, for messages and for files. Default
+  conferences are created only by initial setup (`hadv-setup`) and are not changed
+  automatically afterwards; sysops may freely edit or delete them. A conference cannot be
+  deleted until it has no areas below it; existing areas must be moved or deleted first.
+  Depends on: RBAC, user profile and new-user questions, first-run setup.
+- **Message bases**: public message areas under conferences. If the network type supports it,
+  adding a Sub or Echo asks whether to send a Sub request automatically; deleting one asks
+  whether to send a Drop request; and if the network supports it and the sysop chooses to
+  advertise, the sysop is asked whether to send an update of the Sub or Echo list.
+  Restrictions: the roles that can read (default Sysop, Co-Sysop, User, New User, Guest), post
+  (default Sysop, Co-Sysop, User, New User) and moderate (default Sysop, Co-Sysop); required
+  minimum and maximum age, genders and terminal type, as for conferences. Settings, with
+  defaults: maximum messages (5000); purge by age (off, or days; off); duplicate checking by a
+  hash searched in the area (off, or the number allowed; off); allow anonymous posts (no);
+  require real names (no); require an internet email address (no); allow message quoting
+  (yes); allow word wrap (yes); required reading (no); allow message edit (off, within N
+  minutes, or always; within 15 minutes; networked areas force off), edited messages keeping
+  their prior bodies, readers seeing an "edited" marker and moderators the diff; slow mode, one
+  post per user per N minutes (off); auto-close inactive threads (off, or days; off); pinned
+  messages with an optional expiry date, set by the area's moderators; watched words with an
+  action of block, send to the moderation queue, or tag silently (none seeded); required
+  approval (no). Moderator thread tools: split, merge, move (leaving a stub), close. Maximum
+  message size in bytes or lines (64 KB; networked areas clamp to the network's limit).
+  Attachment policy: off, allowed, or allowed with approval, with a maximum attachment size and
+  count. An origin line or network tagline per area, with a board-wide default. A read-only,
+  archived state: no new posts, existing ones readable (off). Message base packing and
+  renumbering as a maintenance job, safe against in-flight readers. Export a message or thread
+  to text, to print or save to the user's download area. Area aliases or short names usable in
+  menu commands and the `area:` search filter. Default new-scan participation: force on,
+  default on, or default off (default on). Area sort order and numbering independent of
+  creation order, shared with the web front end. Per-area header display: real name or handle,
+  location, and whether the network address is shown. An "Attachment Storage Backend" setting
+  per area, letting its attachments live on a different storage-registry entry from the area's
+  own files. Initial areas, created only during initial setup and freely editable or deletable
+  afterwards: Announcement (read by Sysop, Co-Sysop, User, New User, Guest; required reading,
+  yes) and General Discussion (read by Sysop, Co-Sysop, User, New User, Guest; post by Sysop,
+  Co-Sysop, User, New User; moderate by Sysop, Co-Sysop). Depends on: conferences, account
   deletion.
-- **File bases**: file areas under conferences. Depends on: conferences, account deletion.
+- **File bases**: file areas under conferences. Storage is a separate entry, since more than
+  file areas need it. Local directory and file paths are supported; the architecture must
+  handle availability across servers: a file local to one server may need to be transferred
+  temporarily to another, or marked OFFLINE when its owning server is unavailable. An OFFLINE
+  file stays listed and requestable (default: listed). Metadata is read from files that
+  support it (audio, images) when uploaded outside an archive; EXIF and other embedded
+  metadata are stripped from images on upload after being harvested into the file record
+  (default: strip). A free-file, no-ratio flag per file and per area. A new-files scan since
+  the last call, honouring the same follow graph as the new-message scan. File comments and
+  ratings by users who downloaded the file, using the same reaction model as social media
+  features. Resumable, chunked HTTP uploads on the web front end. Maximum upload size per file
+  and per area (off, or bytes; off). Upload description requirements: minimum length, extended
+  multi-line (default one line, at least 10 characters). An upload credit model: bytes, files
+  or ratio-exempt, with per-role and per-area overrides (default 3:1 by bytes). Download
+  counters per file, with most-downloaded and newest-files listings. Listing options: sort by
+  name, date, size or downloads; pattern filter; paged or full list. A tagged-file batch queue:
+  tag while browsing, download the batch at the session's end. Aborted-upload handling, with
+  resume on the next call for legacy protocols. Uploader attribution in listings, and a "my
+  uploads" view per user. A per-area file naming policy: long names or 8.3, case handling,
+  illegal-character rewriting. Ad-file injection: sysop-configured advertisement text stamped
+  as an extra file into outgoing archives, with its own enable, text and filename settings;
+  default off, and never into an archive that carries a signature. Depends on: conferences,
+  account deletion, storage.
 - **Private messages**: user-to-user mail on the board. Depends on: accounts, RBAC, account
   deletion.
 - **File transfer on classic connections**: upload and download protocols over Telnet and SSH
@@ -512,5 +575,6 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
 
 ## Not yet described
 
-Doors (through the HeliosDoors hosting protocol), node chat, and everything else the developer
-adds as it comes up.
+Doors (through the HeliosDoors hosting protocol), node chat, storage (one storage registry
+shared by file areas, message attachments and more), social media features (the reaction model
+and the follow graph), and everything else the developer adds as it comes up.
