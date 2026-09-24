@@ -134,7 +134,12 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   from re-registration by anyone. Handle validation is one shared check, used wherever a handle
   is set (sign-up, a username change, the sysop's editor): legality, reserved names,
   uniqueness, and UTS #39 confusable skeletons, so look-alike handles cannot be registered.
-  Depends on: accounts and login.
+  A handle may contain spaces, single spaces between words only: leading and trailing spaces
+  are trimmed and runs of spaces collapsed. The mailbox name derived from a handle (a space
+  becoming `.` or `_`) goes through the same uniqueness and confusable check, so "Dark Lord"
+  and "Dark.Lord" cannot both exist. The maximum handle length fits the name fields of the
+  networks the board supports (FTN and QWK among them; the brainstorm confirms the limits).
+  Spaces are revisited if a compatibility issue turns up. Depends on: accounts and login.
 - **Username change**: a user can change their own username; how often is a sysop-configurable
   setting. The old username becomes a former handle. Depends on: reserved and former
   usernames.
