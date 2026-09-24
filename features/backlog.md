@@ -53,6 +53,12 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   Synchronet (CTRL) codes. When importing from VirtualNET-type networks, VBBS and VADV codes
   are converted to correct ANSI; when importing from WWIV-type networks, WWIV codes are
   converted to correct ANSI. Depends on: nothing.
+- **External archivers**: the sysop adds, edits and deletes external archivers (for example
+  7-Zip, PKZIP, unarc) in `hadv-config` and `hadv-config-gui`. Each has command lines with
+  replaceable variables, like the upload and download protocols: a string to detect the
+  archive type from the file header (if possible), and compress, decompress, test and view
+  command lines. Seeded with 7-Zip CLI command lines for the formats 7-Zip supports for both
+  compression and decompression. Depends on: configuration.
 
 ## Callers
 
@@ -317,6 +323,17 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   stored in a separate table linked to the user. Depends on: languages, time zones and
   daylight saving, theme packs, message bases, private messages, file transfer on classic
   connections, SMTP client.
+- **Voting booth**: a voting booth that allows polling. A poll is a question with up to 10
+  replies and an optional write-in, single-choice or multiple-choice (pick N); a poll can be
+  made required at login. RBAC decides who can create polls, set one required, vote, see the
+  summary after voting and see detailed results, and each poll has its own RBAC and
+  restrictions. Defaults: create and set required, Sysop and Co-Sysop; vote and see the
+  summary, Sysop, Co-Sysop, User and New User; see detailed results, Sysop and Co-Sysop.
+  Detailed results honour private profiles. A poll has an expiry date and closes
+  automatically; a closed poll stays readable with its results. Changing your vote: off or
+  until the poll closes, default off. Result visibility: after voting, after close or always,
+  default after voting. A voting booth menu; configurable in `hadv-config`, `hadv-config-gui`
+  and inside the BBS. Depends on: role-based access control.
 
 ## Mail networks
 
@@ -349,7 +366,7 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   Unknown-node inbound handling: Reject, Unsecure inbound or Accept, default Reject. Hub
   operation: per-link read-only echoes and area passthrough. Per-link flow reports: packets
   and bytes in and out, dupes rejected, last successful session. Depends on: mail networks,
-  file bases.
+  file bases, external archivers.
 - **QWK BBS networks (`hadv-qwk`)**: several QWK networks, each with its settings and their
   defaults: enabled (disabled); support gating (no); network name, hub system ID, hub address
   (IP or FQDN), QWK username and QWK password (blank); archive format, from the list in
@@ -358,7 +375,7 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   VOTING.DAT (yes), HEADERS.DAT (yes), UTF-8 characters (yes) and MIME-encoded text (no);
   word-wrap exported messages (no); extended (QWKE) packets (no); export colour code format:
   remove, ANSI or SBBS (remove). Each QWK network keeps its own new-post pointer so no message
-  is sent twice. Depends on: mail networks.
+  is sent twice. Depends on: mail networks, external archivers.
 - **QWK network accounts**: an account flagged as a QWK network account (default no) is the
   account another BBS on a QWK BBS network, such as DoveNET, uses; it is taken straight to the
   QWK menu and logged off when it quits that menu. A setting, default No, has sign-up ask
@@ -371,7 +388,7 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   pointers to date". CONTROL.DAT, MESSAGES.DAT and *.NDX generation options; BULLETIN, NEWS
   and GOODBYE files included. REP import validates the packet's BBS ID, rejects foreign
   packets and handles stale pointers. Depends on: message bases, private messages, file
-  transfer on classic connections.
+  transfer on classic connections, external archivers.
 - **FTP and FTPS server (uploading and downloading files)**: a secure FTP server in
   `hadv-service`, supporting standard FTP and secure FTPS (SSL/TLS). Port binding and
   listening addresses configurable; by default the normal ports, TCP/21 for FTP and TCP/990
@@ -461,7 +478,8 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   converted. An upload the scanner itself failed on is quarantined, a state separate from
   cannot be scanned: an automatic re-scan sweep periodically re-submits quarantined uploads
   and releases each on a clean result, with no human queue entry. Depends on: content
-  moderation, file transfer on classic connections, mail networks, SMTP server.
+  moderation, file transfer on classic connections, mail networks, SMTP server, external
+  archivers.
 - **Bans, suspensions and appeals**: ban user, from the moderation queue, offers a permanent
   ban or a temporary suspension (such as 24 hours, 7 days or 30 days) with automatic
   restoration. A shadow-ban ("silence") sits between suspension and ban: the user sees their
