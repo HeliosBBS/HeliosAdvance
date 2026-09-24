@@ -268,6 +268,16 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   deletion.
 - **File transfer on classic connections**: upload and download protocols over Telnet and SSH
   sessions. Depends on: Telnet and SSH callers, file bases.
+- **Full-screen text editor**: a full-screen text editor for legacy protocols, with ANSI
+  cursor positioning, automatic word wrap, insert and overwrite modes, block and line
+  operations, inline colour code support, extended ASCII support, message quoting and CTRL
+  command support. File attachments are supported where allowed. External full-screen editors
+  may be added later. Web users always get a full-screen editor. Depends on: message bases,
+  private messages, file transfer on classic connections, attribute codes.
+- **Basic line text editor**: a basic line editor with message quoting, for legacy protocols;
+  web users always get a full-screen editor, and legacy protocols default to the full-screen
+  editor. A caller without ANSI gets the line editor, whatever the preference. Depends on:
+  message bases, private messages.
 - **Bulk file import**: `hadv-fileimport` loads files into the board's file bases from the
   command line. Depends on: remote administration, file bases.
 - **SMTP server (receiving email)**: the board receives email for its users. Strict
@@ -325,7 +335,7 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   (yes); private profile (yes, as accounts and login describes). Some of these may be better
   stored in a separate table linked to the user. Depends on: languages, time zones and
   daylight saving, theme packs, message bases, private messages, file transfer on classic
-  connections, SMTP client.
+  connections, SMTP client, full-screen text editor, basic line text editor.
 - **Voting booth**: a voting booth that allows polling. A poll is a question with up to 10
   replies and an optional write-in, single-choice or multiple-choice (pick N); a poll can be
   made required at login. RBAC decides who can create polls, set one required, vote, see the
