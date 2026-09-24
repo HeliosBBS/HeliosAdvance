@@ -97,10 +97,10 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   drawn for. Depends on: nothing.
 - **Telnet caller**: a caller connects over Telnet to a node and reaches the theme's welcome;
   option negotiation; connection limits, per-source throttling (one mechanism shared by every
-  caller surface, honouring the exempt-source list from accounts and login), idle timeouts.
-  Default port TCP/23, default binding all addresses, both changeable in `hadv-config`.
-  Depends on: servers, scripting layer, theme packs, languages, terminal negotiation. Touches
-  the load tester.
+  caller surface, honouring the exempt-source list from accounts and login), idle timeouts. Off
+  by default. Default port TCP/23, default binding all addresses; whether it is on, the port and
+  the binding all changeable in `hadv-config`. Depends on: servers, scripting layer, theme
+  packs, languages, terminal negotiation. Touches the load tester.
 - **Accounts and login**: sign-up, login, sessions across servers, lockouts; a second factor
   when the account's role requires it. A user's profile is private by default, and they may
   make it public: a private user is hidden from search, profile views, who's-online, activity
@@ -196,20 +196,20 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   (default No; US and international). A feature that needs a field the user has not given
   (real name, email address, gender, age) cannot be used by that user. Depends on: accounts
   and login.
-- **Telnet over TLS caller**: the Telnet experience over a TLS-wrapped listener. Default port
-  TCP/992, default binding all addresses, both changeable in `hadv-config`. Depends on:
-  certificates, Telnet caller.
-- **SSH caller**: the same over SSH, host keys from certificates, option negotiation. Default
-  port TCP/22, default binding all addresses, both changeable in `hadv-config`. The sysop
-  guide must explain that on a Linux host the system's own SSH service usually holds TCP/22,
-  and how to move that service to another port (or the board's SSH to another port) so the
-  two do not conflict. Depends on: certificates, Telnet caller. Touches the load tester and
-  the SIP gateway.
-- **Web caller**: a browser reaches the board over HTTP, HTTPS and HTTP/3 and gets the
-  selected theme's web side. Default ports TCP/80 (HTTP), TCP/443 (HTTPS), UDP/443 (QUIC);
-  HTTP redirects to HTTPS by default; default binding all addresses; ports, binding and the
-  redirect all changeable in `hadv-config`. Depends on: scripting layer, theme packs,
-  certificates.
+- **Telnet over TLS caller**: the Telnet experience over a TLS-wrapped listener. Off by default.
+  Default port TCP/992, default binding all addresses; whether it is on, the port and the
+  binding all changeable in `hadv-config`. Depends on: certificates, Telnet caller.
+- **SSH caller**: the same over SSH, host keys from certificates, option negotiation. Off by
+  default. Default port TCP/22, default binding all addresses; whether it is on, the port and
+  the binding all changeable in `hadv-config`. The sysop guide must explain that on a Linux host
+  the system's own SSH service usually holds TCP/22, and how to move that service to another
+  port (or the board's SSH to another port) so the two do not conflict. Depends on:
+  certificates, Telnet caller. Touches the load tester and the SIP gateway.
+- **Web caller**: a browser reaches the board over HTTP, HTTPS and HTTP/3 and gets the selected
+  theme's web side. Off by default. Default ports TCP/80 (HTTP), TCP/443 (HTTPS), UDP/443
+  (QUIC); HTTP redirects to HTTPS by default; default binding all addresses; whether it is on,
+  the ports, the binding and the redirect all changeable in `hadv-config`. Depends on: scripting
+  layer, theme packs, certificates.
 - **Terminal-in-browser rendering**: the classic theme's terminal experience rendered in the
   browser: ANSI with animation and ANSI music. Web users can also play classic ANSI DOS games,
   carried over a WebSocket. The screen is not locked to a fixed 80x25 size that looks tiny on a
@@ -255,6 +255,9 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   to the taskbar and can start minimised so it starts after login. It shows who is on which
   node on which server, and their activity; it spawns the user editor. Depends on: remote
   administration, classic text-mode interface.
+- **Taskview**: in the WFC, see running tasks, with progress if the task supports it, and
+  cancel a task if the task supports it, much as Nutanix Prism Central does. Depends on:
+  Waiting-for-Caller console, scheduled maintenance.
 - **User editor**: `hadv-useredit` and `hadv-useredit-gui`, spawned from the console or run
   alone. Depends on: RBAC, remote administration.
 - **Server join by pairing code**: a sysop adds a server to the board: on the existing server,
@@ -478,14 +481,15 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   processor (tosser) is an external CLI program: `hadv-fido` for FTN (FidoNet Technology
   Networks), `hadv-vnet` for VirtualNET networks, `hadv-qwk` for QWK BBS networks, `hadv-ww4`
   for WWIVnet technology networks and `hadv-nntp` for Usenet. The CLIs only process message
-  packets and take no incoming connections; every transport, incoming and outgoing (BinkP,
-  BinkP over TLS, FTP and FTPS), lives in `hadv-service`. `hadv-nntp` is the one exception:
-  an NNTP client that reaches out, pulls in the selected newsgroups, posts messages, then
-  processes them. Whether the CLIs reach the board's data through the Admin API or through
-  the database directly is decided in the brainstorm: CPU cost through a web server is the
-  concern. Each network listener binds to all addresses on its usual port by default: BinkP
-  TCP/24554, BinkP over TLS TCP/24553, FTP TCP/21, FTPS TCP/990; port and binding changeable
-  in `hadv-config`. Depends on: remote administration, message bases, private messages.
+  packets and take no incoming connections; every transport, incoming and outgoing (BinkP, BinkP
+  over TLS, FTP and FTPS), lives in `hadv-service`. `hadv-nntp` is the one exception: an NNTP
+  client that reaches out, pulls in the selected newsgroups, posts messages, then processes
+  them. Whether the CLIs reach the board's data through the Admin API or through the database
+  directly is decided in the brainstorm: CPU cost through a web server is the concern. The BinkP
+  listeners, BinkP TCP/24554 and BinkP over TLS TCP/24553, are off by default and bind to all
+  addresses; whether each is on, its port and its binding changeable in `hadv-config`. Incoming
+  FTP and FTPS are the FTP and FTPS server's listeners. Depends on: remote administration,
+  message bases, private messages.
 - **FTN networks (`hadv-fido`)**: multiple FTN networks and multiple AKAs per network, with AKA
   matching on export. NODELIST and NODEDIFF filenames configurable per network; when they
   arrive by TIC the nodelist is compiled, for viewing, searching and validating systems for
