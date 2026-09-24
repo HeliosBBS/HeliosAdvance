@@ -39,6 +39,8 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   supplied ones; TLS Telnet, HTTPS and SSH host keys draw on it. ACME is not spoken by the
   engine; an ACME client uses `hadv-cert` to install what it obtained. Depends on:
   configuration.
+- **Time zones and daylight saving**: times shown to callers and sysops follow daylight saving
+  time where appropriate. Depends on: configuration.
 
 ## Callers
 
