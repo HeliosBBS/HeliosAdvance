@@ -341,6 +341,56 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   AUTHINFO USER/PASS authentication, TLS and per-server connection limits. Depends on: mail
   networks, file bases.
 
+## Moderation
+
+- **Content moderation**: one moderation queue where the Sysop, Co-Sysops and users with a
+  moderator role see all content that needs human verification, in a single consolidated view
+  covering every content type: pending message posts, pending file uploads and user-reported
+  content. The backend may be one queue or several aggregated at the presentation layer, as
+  long as the view is unified. The main view is a list of high-level subjects; selecting one
+  opens a detail view with full context (message text, file metadata and virus-scan results,
+  report reason). Actions depend on the type. Messages: approve, delete, view user, ban user,
+  skip, flag to #1 Sysop. Files: approve, move, delete, view user, ban user, skip, flag to #1
+  Sysop. Reported content: approve, delete, view user, view reporter, ban user, skip, reply to
+  reporter, message the content's creator, flag to #1 Sysop. Sequential review mode feeds
+  items one after another, where skip defers the item and loads the next; in the list, skip
+  returns to the list. Multi-select in the list allows mass approve and mass delete, to handle
+  floods and spam. A moderator claims an item so two moderators do not work the same one. RBAC
+  strictly governs what a user sees (only content they are allowed to moderate) and every
+  action and sub-action; the sysop defines the permissions (for example, a moderator who can
+  delete content but not ban users). Reported content is never visible to the user who posted
+  it, except the #1 Sysop. Flag to #1 Sysop raises a high-visibility notification or
+  indicator, such as a prominent red `!`. Every action (approvals, deletions, bans, skips,
+  escalations) is audited with timestamp, item, action and moderator; deleting content
+  prompts for a brief reason, kept with the audit entry or the user's profile. A report
+  carries a structured reason (spam, off-topic, abuse, illegal, or other with text) that
+  drives queue priority. When an active post collects a configurable number of reports from
+  different users, it is withheld from public view and moved to the queue ("withheld", not
+  "quarantined": upload processing uses quarantine for a file its virus scan did not pass, and
+  one word for two states in two subsystems is a defect waiting to happen). A moderator can
+  approve and release a file the scanner flagged as infected: accountable, not the default,
+  and always writing an audit entry naming the verdict overridden. Per-user approval requires
+  approval of a specific user's next N posts, not just per area. The queue can be reviewed
+  from `hadv-console` and `hadv-console-gui`, which show when content is waiting. Each
+  moderator can opt in or out of real-time alerts when a new item enters the queue. Depends
+  on: message bases, file bases, private messages, Waiting-for-Caller console.
+- **Bans, suspensions and appeals**: ban user, from the moderation queue, offers a permanent
+  ban or a temporary suspension (such as 24 hours, 7 days or 30 days) with automatic
+  restoration. A shadow-ban ("silence") sits between suspension and ban: the user sees their
+  own posts and nobody else does (default: Sysop and Co-Sysop). Banning prompts for a brief
+  reason, kept with the audit entry or the user's profile, and for what happens to the user's
+  content: delete all of it, replace their name with a placeholder such as "Banned User", or
+  take no action. A banned user from an external network is added to a global ban list, and
+  the mail tossers reject their future messages. Shared ban lists are an opt-in subscription
+  to another Helios system's signed, exported ban list. Appeals (default on, one per 7 days):
+  a banned or suspended user can log in to one restricted screen that sends one message to the
+  moderation queue. An appeal escalates to the #1 Sysop automatically when every
+  otherwise-eligible moderator has a conflict of interest with it (for example, the only
+  moderator is the one who applied the ban). Depends on: content moderation, mail networks.
+- **Sysop notification triggers**: the Sysop is notified of a new user, an upload awaiting
+  approval, feedback received and an appeal filed, in the inbox and optionally by email.
+  Depends on: bans, suspensions and appeals.
+
 ## Not yet described
 
 Doors (through the HeliosDoors hosting protocol), attribute codes (colour and heart codes),
