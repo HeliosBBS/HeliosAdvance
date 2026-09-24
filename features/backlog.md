@@ -220,6 +220,12 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   servers' inter-server bus is LISTEN/NOTIFY, which needs a persistent session, and
   transaction-mode pooling breaks it silently. Depends on: servers, nodes and one board;
   the sysop guide.
+- **Developer mode**: a mode that, when enabled, logs additional statistics needed for future
+  development and optimisation, and measures the performance of routines and functions to
+  show where code needs improving. Which metrics is still to be determined; the platform
+  architecture (x86-64, ARM) and the operating system are included. The format is JSON.
+  Metrics are local to each server and are never sent anywhere. It works hand in hand with the
+  load tester. Depends on: servers, Telnet caller. Touches the load tester.
 
 ## Content
 
