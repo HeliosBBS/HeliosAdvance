@@ -36,8 +36,9 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   the sysop has flagged as the default; the sysop installs, flags and disables packs. Two ship.
   The modern theme is the fallback every other pack falls back to, cannot be deleted, is not
   supported if edited; a sysop can disable it from selection and flag another pack as the
-  default. Where theme files live (database or
-  disk, and how every server gets them) is decided here, not assumed. Depends on: scripting
+  default. Packs carry metadata and versioning, and are installed and updated through
+  `hadv-config` and `hadv-config-gui`. Where theme files live (database or disk, and how every
+  server gets them) is decided here, not assumed. Depends on: scripting
   layer.
 - **Certificates**: `hadv-cert` (TUI only) generates self-signed certificates and installs
   supplied ones; TLS Telnet, HTTPS and SSH host keys draw on it. ACME is not spoken by the
@@ -174,19 +175,27 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   `X-Real-IP`, `Forwarded`; honoured only from a trusted proxy list so the caller's address
   cannot be forged. Depends on: Telnet, SSH and web callers.
 - **Languages**: every string the whole estate uses lives in one TOML file per language, at
-  `lang/<code>/<code>.toml` (for example `lang/en-us/en-us.toml`), or in the database; which
-  of the two, and how every server gets them, is decided in the brainstorm, not assumed. Each
-  file names its language (`en-us = English (United States)`). Strings are structured so the
-  board can be translated into any living language: verb tenses, plural, gender and case
-  handled so languages other than English read correctly. Parody languages such as pirate are
-  supported too. Research the existing standards for this before designing anything of our
-  own. `hadv-strings` and `hadv-strings-gui` edit the files. An executable picks its language
-  from the operating system and falls back to en-us when that language is not available;
-  en-us ships with the board and others are added later. A user picks from the available
-  languages when creating their account and can change it in their preferences. Every string
-  passes through one parser that replaces placeholders such as `{BBSNAME}` and colour codes.
-  Depends on: configuration, classic text-mode interface, accounts and login. Touches every
-  repository in the estate.
+  `lang/<code>/<code>.toml` (for example `lang/en-us/en-us.toml`), or in the database; which of
+  the two, and how every server gets them, is decided in the brainstorm, not assumed. Each file
+  names its language (`en-us = English (United States)`). Translations work in both legacy code
+  pages and UTF-8. Strings are structured so the board can be translated into any living
+  language: verb tenses, plural, gender and case handled so languages other than English read
+  correctly, with plural rules per language (CLDR-style categories) rather than a single plural
+  form, and gendered and ordinal forms where the language requires them. Numbers, dates and
+  currency are formatted per locale, separately from the user's date-format preference. Parody
+  languages such as pirate are supported too. Research the existing standards for this before
+  designing anything of our own. `hadv-strings` and `hadv-strings-gui` edit the files. Language
+  files do not embed colour codes; they use theme-defined macros to set colours, preserving
+  theme integrity. A string missing from a language falls back to the board's default language,
+  then to en-us, which ships complete, and is logged once; a raw tag is never shown. Language
+  packs carry metadata and versioning, mirroring themes, and are installed and updated through
+  `hadv-config` and `hadv-config-gui`. An executable picks its language from the operating
+  system and falls back to en-us when that language is not available; en-us ships with the
+  board and others are added later. A user picks from the available languages when creating
+  their account and can change it in their preferences. Every string passes through one parser
+  that replaces placeholders such as `{BBSNAME}` and the theme's colour macros. Depends on:
+  theme packs, classic text-mode interface, accounts and login. Touches every repository in the
+  estate.
 
 ## Operating the board
 
