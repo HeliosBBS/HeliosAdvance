@@ -108,11 +108,20 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
 - **Proxies in front of the board**: PROXY protocol v1 and v2, `X-Forwarded-For`,
   `X-Real-IP`, `Forwarded`; honoured only from a trusted proxy list so the caller's address
   cannot be forged. Depends on: Telnet, SSH and web callers.
-- **Languages**: every string in one TOML file per language, shared by every executable;
-  plural, gender and case handled so languages other than English read correctly;
-  `hadv-strings` and `hadv-strings-gui` edit them. Where language files live (database or
-  disk, and how every server gets them) is decided here, not assumed. Depends on:
-  configuration.
+- **Languages**: every string the whole estate uses lives in one TOML file per language, at
+  `lang/<code>/<code>.toml` (for example `lang/en-us/en-us.toml`), or in the database; which
+  of the two, and how every server gets them, is decided in the brainstorm, not assumed. Each
+  file names its language (`en-us = English (United States)`). Strings are structured so the
+  board can be translated into any living language: verb tenses, plural, gender and case
+  handled so languages other than English read correctly. Parody languages such as pirate are
+  supported too. Research the existing standards for this before designing anything of our
+  own. `hadv-strings` and `hadv-strings-gui` edit the files. An executable picks its language
+  from the operating system and falls back to en-us when that language is not available;
+  en-us ships with the board and others are added later. A user picks from the available
+  languages when creating their account and can change it in their preferences. Every string
+  passes through one parser that replaces placeholders such as `{BBSNAME}` and colour codes.
+  Depends on: configuration, classic text-mode interface, accounts and login. Touches every
+  repository in the estate.
 
 ## Operating the board
 
