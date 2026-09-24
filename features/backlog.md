@@ -241,6 +241,42 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   sessions. Depends on: Telnet and SSH callers, file bases.
 - **Bulk file import**: `hadv-fileimport` loads files into the board's file bases from the
   command line. Depends on: remote administration, file bases.
+- **SMTP server (receiving email)**: the board receives email for its users. Strict
+  anti-relay rules: accept only email for local users and local domains. Port binding and
+  listening addresses configurable. Maximum simultaneous connections configurable, default
+  100, shared across the SMTP, POP3 and IMAP servers. The SMTP server and each transport mode
+  can be enabled and disabled individually in configuration. The normal internet ports by
+  default: TCP/25 receives from other mail servers, with STARTTLS offered and plain text
+  accepted from a server that does not use it, for legacy network compatibility; TCP/587
+  (STARTTLS) and TCP/465 (implicit TLS, SMTPS) are the submission ports for users' email
+  clients, a later feature. Per-user address format: `handle@domain`, `first.last@domain` or
+  a user-chosen alias, default `handle@domain`. Per-user address aliases; a catch-all or
+  postmaster destination. Mailbox quota per user and per role, with a warning threshold,
+  default off. Maximum accepted message size and maximum attachment size, default 25 MB. The
+  board's private mail and external email share one store. Depends on: private messages,
+  certificates, user profile and new-user questions.
+- **SMTP client (sending email)**: the board delivers outbound email directly to destination
+  mail servers, or forwards it to a dedicated SMTP relay configured in `hadv-config` and
+  `hadv-config-gui`; configuring a relay automatically disables direct delivery (possibly a
+  dynamic toggle). Per-domain rate limiting, thresholds configurable, so destination servers
+  do not block the board. A robust local mail queue for deferrals and retries, with
+  configurable exponential backoff for connection and delivery retries. DKIM signing; ARC
+  (Authenticated Received Chain); modern forwarding mechanics that preserve upstream
+  validation (DKIM, SPF, DMARC). The goal is not for users to set up an email client and send
+  through the board; that may be a later feature. Depends on: SMTP server.
+- **POP3 client (receiving email)**: the board retrieves inbound mail from a catch-all mailbox
+  on an external POP3 server, over POP3 or POP3S (SSL/TLS), and automatically parses and
+  routes it to the right internal user. It generates a bounce when the recipient does not
+  exist or delivery fails; the sysop can suppress bounces to bound backscatter. Background
+  polling interval configurable; deleting mail from the server after processing is a
+  configurable option. Depends on: SMTP client.
+- **IMAP client (receiving email)**: the board retrieves inbound mail from a catch-all mailbox
+  on an external IMAP server, over IMAP or IMAPS (SSL/TLS), and parses and routes it to
+  internal users. It generates a bounce for a non-existent or failed recipient; the sysop can
+  suppress bounces to bound backscatter. It keeps the IMAP session connected to use push (the
+  IDLE command), and falls back to background polling, interval configurable, for a server
+  without push. Deleting processed mail from the server is a configurable option. Depends on:
+  SMTP client.
 - **User statistics**: per account: first on, last on, logons today and in total, posts today
   and in total, netmail and email sent and received today and in total, netmail and email sent
   to sysops in total, uploads and upload bytes in total, downloads and download bytes in total.
@@ -260,7 +296,7 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   (yes); private profile (yes, as accounts and login describes). Some of these may be better
   stored in a separate table linked to the user. Depends on: languages, time zones and
   daylight saving, theme packs, message bases, private messages, file transfer on classic
-  connections.
+  connections, SMTP client.
 
 ## Mail networks
 
@@ -389,7 +425,7 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   moderator is the one who applied the ban). Depends on: content moderation, mail networks.
 - **Sysop notification triggers**: the Sysop is notified of a new user, an upload awaiting
   approval, feedback received and an appeal filed, in the inbox and optionally by email.
-  Depends on: bans, suspensions and appeals.
+  Depends on: bans, suspensions and appeals, SMTP client.
 
 ## Not yet described
 
