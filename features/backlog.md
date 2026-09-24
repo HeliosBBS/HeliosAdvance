@@ -616,8 +616,18 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   approval, feedback received and an appeal filed, in the inbox and optionally by email.
   Depends on: bans, suspensions and appeals, SMTP client.
 
+## Chat
+
+- **Multi-user chat**: users chat with other online users in an IRC-style chat, supported by
+  the content moderation system, honouring blocks and private profiles as who's online does.
+  Depends on: who's online, content moderation.
+- **Sysop break-in chat**: the Sysop can break in on a caller with a two-way split-screen chat
+  from the WFC consoles (`hadv-console`, `hadv-console-gui`). Sysop only by default; the Sysop
+  can grant the permission to other roles. A caller without ANSI gets line-by-line chat.
+  Depends on: Waiting-for-Caller console, terminal capabilities.
+
 ## Not yet described
 
-Node chat, storage (one storage registry shared by file areas, message attachments and more),
-social media features (the reaction model and the follow graph), and everything else the
-developer adds as it comes up.
+Storage (one storage registry shared by file areas, message attachments and more), social
+media features (the reaction model and the follow graph), and everything else the developer adds
+as it comes up.
