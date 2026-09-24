@@ -172,7 +172,10 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   redirect all changeable in `hadv-config`. Depends on: scripting layer, theme packs,
   certificates.
 - **Terminal-in-browser rendering**: the classic theme's terminal experience rendered in the
-  browser: ANSI to HTML with animation and ANSI music. Depends on: web caller.
+  browser: ANSI with animation and ANSI music. Web users can also play classic ANSI DOS games,
+  carried over a WebSocket. The screen is not locked to a fixed 80x25 size that looks tiny on a
+  2K or 4K monitor: the font scales to take up more of the page without breaking the aspect
+  ratio, and rescales dynamically when the window is resized. Depends on: web caller.
 - **Modern theme**: rich HTML on the web and a lightbar ANSI system on the terminal; shipped;
   the fallback. Depends on: theme packs, Telnet caller, web caller.
 - **Classic theme**: strictly text-based; shipped; the web server renders it by conversion.
