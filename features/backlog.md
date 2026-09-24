@@ -195,7 +195,8 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
 - **User statistics**: per account: first on, last on, logons today and in total, posts today
   and in total, netmail and email sent and received today and in total, netmail and email sent
   to sysops in total, uploads and upload bytes in total, downloads and download bytes in total.
-  Depends on: accounts and login, message bases, private messages, file bases.
+  A day for the "today" counters is a day in the board's time zone. Depends on: accounts and
+  login, message bases, private messages, file bases, time zones and daylight saving.
 - **User preferences**: each user sets, with its default: language and time zone (the
   board's); short date format such as MM/DD/YYYY, and time format, 12 or 24 hour (the board's);
   theme (the default theme set in `hadv-config` and `hadv-config-gui`); terminal type:
