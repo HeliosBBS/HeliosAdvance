@@ -95,8 +95,12 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   something, or their second factor); account #1, the main sysop account, cannot delete
   itself. Deleting an account, whether the user, the Sysop or maintenance does it, puts it in
   a virtual deleted state, like a recycle bin, for a period configurable in `hadv-config` and
-  `hadv-config-gui` up to a ceiling of 30 days, before it is deleted permanently. While in
-  that state the account is hidden, blocked from login and absent from the user list; its
+  `hadv-config-gui` up to a ceiling of 30 days, before it is deleted permanently. Maintenance
+  deletes an account that has been inactive for longer than its role's Maximum Days of User
+  Inactivity, a setting every role carries and the sysop can change on it: the Sysop role
+  defaults to unlimited, Co-Sysop to 365 days, User to 180, New User to 30, and a new role to
+  180. Account #1, the main sysop account, is never deleted for inactivity. While in the
+  virtual deleted state the account is hidden, blocked from login and absent from the user list; its
   username and email address cannot be reused by a new user; the Sysop or a Co-Sysop can
   restore it. When the account is deleted permanently, any messages in its mailbox are
   deleted and cannot be restored, and its username and email address may be reused, subject
