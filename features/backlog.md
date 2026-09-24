@@ -218,8 +218,13 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
 - **Mail networks**: the board supports several kinds of BBS network, and each kind's mail
   processor (tosser) is an external CLI program: `hadv-fido` for FTN (FidoNet Technology
   Networks), `hadv-vnet` for VirtualNET networks, `hadv-qwk` for QWK BBS networks, `hadv-ww4`
-  for WWIVnet technology networks and `hadv-nntp` for Usenet. Depends on: remote
-  administration, message bases, private messages.
+  for WWIVnet technology networks and `hadv-nntp` for Usenet. The CLIs only process message
+  packets and take no incoming connections; every transport, incoming and outgoing (BinkP,
+  BinkP over TLS, FTP and FTPS), lives in `hadv-service`. `hadv-nntp` is the one exception:
+  an NNTP client that reaches out, pulls in the selected newsgroups, posts messages, then
+  processes them. Whether the CLIs reach the board's data through the Admin API or through
+  the database directly is decided in the brainstorm: CPU cost through a web server is the
+  concern. Depends on: remote administration, message bases, private messages.
 - **FTN networks (`hadv-fido`)**: multiple FTN networks and multiple AKAs per network, with AKA
   matching on export. NODELIST and NODEDIFF filenames configurable per network; when they
   arrive by TIC the nodelist is compiled, for viewing, searching and validating systems for
@@ -231,7 +236,7 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   duplicate-message database with configurable retention, default 30 days. AreaFix and
   AreaMgr, inbound and outbound. TIC processing: inbound files routed to file areas, outbound
   hatching. Per-link session, packet, TIC and AreaFix passwords, stored in the shared secret
-  store. BinkP 1.1 transport with CRAM-MD5, plus BinkD-compatible outbound scheduling. Type
+  store. BinkP 1.1 transport with CRAM-MD5, BinkP over TLS, and BinkD-compatible outbound scheduling. Type
   2+ and 2.2 packets read and written; a maximum message body size on export. A routing
   table: which links get which netmail, hub and uplink designation, bundle archive format.
   Unknown-node inbound handling: Reject, Unsecure inbound or Accept, default Reject. Hub
@@ -243,7 +248,7 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   BBSLIST.* and AREALIST.* files. Network roles NC, RC, AC and SC. ADD and DROP SUB requests
   and SUB CREATE. Flow reports. ORIGIN.ID. Being a hub for other nodes, which log in by FTP or
   SFTP as `<nodenumber>@~<networkname>`. The developer will provide a full specification.
-  Depends on: mail networks, file bases, FTP and SFTP server.
+  Depends on: mail networks, file bases, FTP and FTPS server.
 - **QWK BBS networks (`hadv-qwk`)**: several QWK networks, each with its settings and their
   defaults: enabled (disabled); support gating (no); network name, hub system ID, hub address
   (IP or FQDN), QWK username and QWK password (blank); archive format, from the list in
@@ -269,11 +274,11 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
 - **WWIV networks (`hadv-ww4`)**: the WWIVnet packet specification. Address format
   `@node.netname`; multiple WWIVnet networks, each with its own node number. Sub hosting: the
   host and subscriber model, add and drop sub requests, a host designated per sub. BBSLIST,
-  CONNECT and CALLOUT data maintained and distributed. Packet transport through
-  `hadv-service`, with per-link passwords. WWIV email routed inbound and outbound to local
+  CONNECT and CALLOUT data maintained and distributed. Packet transport by BinkP
+  through `hadv-service`, with per-link passwords. WWIV email routed inbound and outbound to local
   users. Heart codes translated on import and export (see attribute codes). Depends on: mail
   networks.
-- **Usenet (`hadv-nntp`)**: a tosser for Usenet. Multiple NNTP networks (such as "Usenet"
+- **Usenet (`hadv-nntp`)**: an NNTP client and tosser for Usenet. Multiple NNTP networks (such as "Usenet"
   and "InterNetNews"), each with several Usenet servers for backfill and one designated for
   sending posts. Nothing is imported automatically: the sysop sets up each newsgroup as a
   message base, or links a file area to a binary newsgroup, and links it to a network, an
@@ -288,4 +293,4 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
 ## Not yet described
 
 Doors (through the HeliosDoors hosting protocol), attribute codes (colour and heart codes),
-an FTP and SFTP server, node chat, and everything else the developer adds as it comes up.
+an FTP and FTPS server in `hadv-service`, node chat, and everything else the developer adds as it comes up.
