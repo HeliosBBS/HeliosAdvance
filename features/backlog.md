@@ -402,7 +402,7 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   carries a structured reason (spam, off-topic, abuse, illegal, or other with text) that
   drives queue priority. When an active post collects a configurable number of reports from
   different users, it is withheld from public view and moved to the queue ("withheld", not
-  "quarantined": upload processing uses quarantine for a file its virus scan did not pass, and
+  "quarantined": virus scanning uses quarantine for an upload stuck on a scanner failure, and
   one word for two states in two subsystems is a defect waiting to happen). A moderator can
   approve and release a file the scanner flagged as infected: accountable, not the default,
   and always writing an audit entry naming the verdict overridden. Per-user approval requires
@@ -410,6 +410,27 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   from `hadv-console` and `hadv-console-gui`, which show when content is waiting. Each
   moderator can opt in or out of real-time alerts when a new item enters the queue. Depends
   on: message bases, file bases, private messages, Waiting-for-Caller console.
+- **Virus scanning and archive conversion**: uploads are virus scanned online, offline or in
+  the background, chosen in `hadv-config` and `hadv-config-gui`. Online scans immediately
+  after the upload and shows the user a progress screen; offline scans after the user has
+  signed off and sends a notification with the results; background scans while the user is
+  still online, followed by a notification of the results. The virus scanner and its command
+  line or lines are configurable, default the ClamAV command line. A maximum file size: a file
+  over it cannot be scanned. A maximum recursion: how deep the scan goes into archives inside
+  archives. Notifying the user is configurable, default notify. A file that fails its scan is
+  flagged or deleted, default delete; a file that cannot be scanned, an oversized one
+  included, is flagged or deleted, default flag. Flag sends the file to content moderation,
+  hidden until approved. Archives can be converted to a different format, default no
+  conversion: a file type that cannot be decompressed is compressed into the converted
+  archive type, and the directory structure inside an archive is preserved when decompressing
+  and carried into the converted archive. Archives inside archives are detected, decompressed
+  and scanned as well, but not converted. Files arriving through BBS networks are scanned too;
+  when the board is a network hub, files only passing through, not being added to the board,
+  are neither converted nor scanned. Email attachments to local users are scanned but not
+  converted. An upload the scanner itself failed on is quarantined, a state separate from
+  cannot be scanned: an automatic re-scan sweep periodically re-submits quarantined uploads
+  and releases each on a clean result, with no human queue entry. Depends on: content
+  moderation, file transfer on classic connections, mail networks, SMTP server.
 - **Bans, suspensions and appeals**: ban user, from the moderation queue, offers a permanent
   ban or a temporary suspension (such as 24 hours, 7 days or 30 days) with automatic
   restoration. A shadow-ban ("silence") sits between suspension and ban: the user sees their
