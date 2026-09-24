@@ -179,23 +179,15 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
 
 ## Operating the board
 
-- **Admin API**: being brainstormed as part of **remote administration** (ADV-002), with
-  operator sign-in and tokens: sign-in with 2FA, session tokens scoped for automation, the
-  audit naming the credential, long-lived console tokens whose lifetime is tunable in
-  `hadv-config` between a hard floor and ceiling. The Admin API is TCP only; HTTP/3 is
-  dropped for it. The original line: what the configuration,
-  console, user-editor and strings tools use; nothing
-  but the engine touches the database. Default ports TCP/8443 (HTTPS) and UDP/8443 (QUIC),
-  default binding all addresses, changeable in `hadv-config`. Depends on: RBAC.
 - **Public API**: the board's HTTP interface for clients, with its OpenAPI description.
   Depends on: web caller, accounts, RBAC. Touches the Portal and the load tester.
 - **Waiting-for-Caller console**: `hadv-console` (TUI only; no CLI unless a use case appears)
   and `hadv-console-gui`, run on the server or remotely; long-lived tokens; the GUI minimises
-  to the taskbar and can start minimised so it starts after login. Depends on: remote
-  administration, classic text-mode interface. The original line: who is on which node
-  on which server, activity; spawns the user editor. Depends on: Admin API.
+  to the taskbar and can start minimised so it starts after login. It shows who is on which
+  node on which server, and their activity; it spawns the user editor. Depends on: remote
+  administration, classic text-mode interface.
 - **User editor**: `hadv-useredit` and `hadv-useredit-gui`, spawned from the console or run
-  alone. Depends on: RBAC, Admin API.
+  alone. Depends on: RBAC, remote administration.
 - **Server join by pairing code**: a sysop adds a server to the board: on the existing server,
   `hadv-config` shows a code; on the new server, `hadv-setup` asks for the existing server's
   address and the code; once the two agree, the new server receives what it needs over a
@@ -242,7 +234,7 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
 - **File transfer on classic connections**: upload and download protocols over Telnet and SSH
   sessions. Depends on: Telnet and SSH callers, file bases.
 - **Bulk file import**: `hadv-fileimport` loads files into the board's file bases from the
-  command line. Depends on: Admin API, file bases.
+  command line. Depends on: remote administration, file bases.
 - **User statistics**: per account: first on, last on, logons today and in total, posts today
   and in total, netmail and email sent and received today and in total, netmail and email sent
   to sysops in total, uploads and upload bytes in total, downloads and download bytes in total.
