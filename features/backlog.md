@@ -224,7 +224,9 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   an NNTP client that reaches out, pulls in the selected newsgroups, posts messages, then
   processes them. Whether the CLIs reach the board's data through the Admin API or through
   the database directly is decided in the brainstorm: CPU cost through a web server is the
-  concern. Depends on: remote administration, message bases, private messages.
+  concern. Each network listener binds to all addresses on its usual port by default: BinkP
+  TCP/24554, BinkP over TLS TCP/24553, FTP TCP/21, FTPS TCP/990; port and binding changeable
+  in `hadv-config`. Depends on: remote administration, message bases, private messages.
 - **FTN networks (`hadv-fido`)**: multiple FTN networks and multiple AKAs per network, with AKA
   matching on export. NODELIST and NODEDIFF filenames configurable per network; when they
   arrive by TIC the nodelist is compiled, for viewing, searching and validating systems for
