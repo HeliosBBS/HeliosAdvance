@@ -43,8 +43,12 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
 - **Certificates**: `hadv-cert` (TUI only) generates self-signed certificates and installs
   supplied ones; TLS Telnet, HTTPS and SSH host keys draw on it. ACME is not spoken by the
   engine; an ACME client uses `hadv-cert` to install what it obtained. Certificates reload
-  without a restart, so an ACME client can update them while the board runs. Depends on:
-  configuration.
+  without a restart, so an ACME client can update them while the board runs. Every networked
+  service that offers encryption does it over TLS 1.2 or TLS 1.3; the default key exchange
+  uses perfect forward secrecy. SAN (Subject Alternative Name) and wildcard certificates are
+  supported for all TLS services. High key sizes are supported and compromised key sizes
+  rejected. The sysop configures TLS 1.2, TLS 1.3 and the key exchange in `hadv-config` and
+  `hadv-config-gui`; they default to secure settings. Depends on: configuration.
 - **Time zones and daylight saving**: times shown to callers and sysops follow daylight saving
   time where appropriate. Depends on: configuration.
 - **Attribute codes**: the colour and heart codes the board supports: WWIV, VBBS and VADV
