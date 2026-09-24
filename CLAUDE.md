@@ -107,6 +107,9 @@ bare (`gh signoff 32 HeliosAdvance`): the alias adds the organisation itself.
 - **Errors are never swallowed**: checked, wrapped with context, classified at boundaries;
   access gates fail closed.
 - **Every I/O takes a context with a deadline**; cancellation is honoured; shutdown drains.
+- **Time is Y2K- and Y2K38-safe**: stored and exchanged as UTC with a four-digit year and at
+  least 64 bits of seconds; a legacy format with a two-digit year or a 32-bit time is
+  converted at its boundary, with a stated pivot, and tested across 2000 and 2038.
 - **Validate at trust boundaries** (user input, the network, sysop scripts, doors, peers),
   trust internal code; least privilege everywhere; parameterised queries only.
 - **Observability**: `log/slog` only, structured, with a correlation ID per session or job;
