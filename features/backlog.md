@@ -185,17 +185,18 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
 - **Account recovery**: a user who has forgotten their password, or lost their second factor,
   gets their account back. Depends on: accounts and login, second factor.
 - **User profile and new-user questions**: the board stores, per account: deleted status, user
-  number, handle, real name, company name, BBS name, email address, gender, birth date,
-  address, location, zip code and phone number. Each question a new user is asked has a
-  setting in `hadv-config` and `hadv-config-gui` of No, Optional or Required: real name
-  (default Required; the sysop chooses, because a board that joins FidoNet must use real
-  names; force a multi-word name, default Yes); company name (default No); email address (default Required); gender (No or Optional
-  only, default No; the accepted gender codes are configured elsewhere); birth date (default
+  number, handle, real name, company name, BBS name, email address, gender (a single gender
+  code), birth date, address, location, zip code and phone number. Each question a new user is
+  asked has a setting in `hadv-config` and `hadv-config-gui` of No, Optional or Required: real
+  name (default Required; the sysop chooses, because a board that joins FidoNet must use real
+  names; force a multi-word name, default Yes); company name (default No); email address
+  (default Required); gender (No or Optional only, default No; the user picks one code from the
+  gender codes the sysop sets in `hadv-config` and `hadv-config-gui`: a string, one letter per
+  gender, default `MFX`, to which the sysop can add codes or delete them); birth date (default
   No); address and zip code (default No; US and international); location, such as city, state
-  and country (default Optional; optionally require a comma, default No); phone number
-  (default No; US and international). A feature that needs a field the user has not given
-  (real name, email address, gender, age) cannot be used by that user. Depends on: accounts
-  and login.
+  and country (default Optional; optionally require a comma, default No); phone number (default
+  No; US and international). A feature that needs a field the user has not given (real name,
+  email address, gender, age) cannot be used by that user. Depends on: accounts and login.
 - **Telnet over TLS caller**: the Telnet experience over a TLS-wrapped listener. Off by default.
   Default port TCP/992, default binding all addresses; whether it is on, the port and the
   binding all changeable in `hadv-config`. Depends on: certificates, Telnet caller.
@@ -321,36 +322,34 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
 - **Message bases**: public message areas under conferences. If the network type supports it,
   adding a Sub or Echo asks whether to send a Sub request automatically; deleting one asks
   whether to send a Drop request; and if the network supports it and the sysop chooses to
-  advertise, the sysop is asked whether to send an update of the Sub or Echo list.
-  Restrictions: the roles that can read (default Sysop, Co-Sysop, User, New User, Guest), post
-  (default Sysop, Co-Sysop, User, New User) and moderate (default Sysop, Co-Sysop); required
-  minimum and maximum age, genders and terminal type, as for conferences. Settings, with
-  defaults: maximum messages (5000); purge by age (off, or days; off); duplicate checking by a
-  hash searched in the area (off, or the number allowed; off); allow anonymous posts (no);
-  require real names (no); require an internet email address (no); allow message quoting
-  (yes); allow word wrap (yes); required reading (no); allow message edit (off, within N
-  minutes, or always; within 15 minutes; networked areas force off), edited messages keeping
-  their prior bodies, readers seeing an "edited" marker and moderators the diff; slow mode, one
-  post per user per N minutes (off); auto-close inactive threads (off, or days; off); pinned
-  messages with an optional expiry date, set by the area's moderators; watched words with an
-  action of block, send to the moderation queue, or tag silently (none seeded); required
-  approval (no). Moderator thread tools: split, merge, move (leaving a stub), close. Maximum
-  message size in bytes or lines (64 KB; networked areas clamp to the network's limit).
-  Attachment policy: off, allowed, or allowed with approval, with a maximum attachment size and
-  count. An origin line or network tagline per area, with a board-wide default. A read-only,
-  archived state: no new posts, existing ones readable (off). Message base packing and
-  renumbering as a maintenance job, safe against in-flight readers. Export a message or thread
-  to text, to print or save to the user's download area. Area aliases or short names usable in
-  menu commands and the `area:` search filter. Default new-scan participation: force on,
-  default on, or default off (default on). Area sort order and numbering independent of
-  creation order, shared with the web front end. Per-area header display: real name or handle,
-  location, and whether the network address is shown. An "Attachment Storage Backend" setting
-  per area, letting its attachments live on a different storage-registry entry from the area's
-  own files. Initial areas, created only during initial setup and freely editable or deletable
-  afterwards: Announcement (read by Sysop, Co-Sysop, User, New User, Guest; required reading,
-  yes) and General Discussion (read by Sysop, Co-Sysop, User, New User, Guest; post by Sysop,
-  Co-Sysop, User, New User; moderate by Sysop, Co-Sysop). Depends on: conferences, account
-  deletion, scheduled maintenance.
+  advertise, the sysop is asked whether to send an update of the Sub or Echo list. Restrictions:
+  the roles that can read (default Sysop, Co-Sysop, User, New User, Guest), post (default Sysop,
+  Co-Sysop, User, New User) and moderate (default Sysop, Co-Sysop); required minimum and maximum
+  age, genders and terminal type, as for conferences. Settings, with defaults: maximum messages
+  (5000); purge by age (off, or days; off); duplicate checking by a hash searched in the area
+  (off, or the number allowed; off); allow anonymous posts (no); require real names (no);
+  require an internet email address (no); allow message quoting (yes); allow word wrap (yes);
+  required reading (no); allow message edit (off, within N minutes, or always; within 15
+  minutes; networked areas force off), edited messages keeping their prior bodies, readers
+  seeing an "edited" marker and moderators the diff; slow mode, one post per user per N minutes
+  (off); auto-close inactive threads (off, or days; off); pinned messages with an optional
+  expiry date, set by the area's moderators; watched words with an action of block, send to the
+  moderation queue, or tag silently (none seeded); required approval (no). Moderator thread
+  tools: split, merge, move (leaving a stub), close. Maximum message size in bytes or lines (64
+  KB; networked areas clamp to the network's limit). Attachment policy: off, allowed, or allowed
+  with approval, with a maximum attachment size and count. An origin line or network tagline per
+  area, with a board-wide default. A read-only, archived state: no new posts, existing ones
+  readable (off). Message base packing and renumbering as a maintenance job, safe against
+  in-flight readers. Area aliases or short names usable in menu commands and the `area:` search
+  filter. Default new-scan participation: force on, default on, or default off (default on).
+  Area sort order and numbering independent of creation order, shared with the web front end.
+  Per-area header display: real name or handle, location, and whether the network address is
+  shown. An "Attachment Storage Backend" setting per area, letting its attachments live on a
+  different storage-registry entry from the area's own files. Initial areas, created only during
+  initial setup and freely editable or deletable afterwards: Announcement (read by Sysop,
+  Co-Sysop, User, New User, Guest; required reading, yes) and General Discussion (read by Sysop,
+  Co-Sysop, User, New User, Guest; post by Sysop, Co-Sysop, User, New User; moderate by Sysop,
+  Co-Sysop). Depends on: conferences, account deletion, scheduled maintenance.
 - **File bases**: file areas under conferences. Storage is a separate entry, since more than
   file areas need it. Local directory and file paths are supported; the architecture must
   handle availability across servers: a file local to one server may need to be transferred
