@@ -202,7 +202,8 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   language: verb tenses, plural, gender and case handled so languages other than English read
   correctly, with plural rules per language (CLDR-style categories) rather than a single plural
   form, and gendered and ordinal forms where the language requires them. Numbers, dates and
-  currency are formatted per locale, separately from the user's date-format preference. Parody
+  currency are formatted per locale, separately from the user's date-format preference. Sizes
+  are shown in human units (kilobytes, megabytes and so on), formatted per locale. Parody
   languages such as pirate are supported too. Research the existing standards for this before
   designing anything of our own. `hadv-strings` and `hadv-strings-gui` edit the files. Language
   files do not embed colour codes; they use theme-defined macros to set colours, preserving
@@ -395,6 +396,14 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   to sysops in total, uploads and upload bytes in total, downloads and download bytes in total.
   A day for the "today" counters is a day in the board's time zone. Depends on: accounts and
   login, message bases, private messages, file bases, time zones and daylight saving.
+- **BBS statistics**: board-wide counters: logons, online time, netmail and email sent,
+  feedback sent, new users, posts, uploads and upload bytes, downloads and download bytes
+  today, and the maximum concurrent connections, in total and per connection type. Every
+  counter is recorded per node and BBS-wide, and the console can view either. All-time totals
+  sit alongside today's counters; the daily rollover is owned by daily maintenance. Statistics
+  export as CSV or JSON from the Admin API and the console. A histogram of the busiest hours
+  and days, and the peak concurrent sessions with the time they occurred. Depends on: user
+  statistics, Waiting-for-Caller console.
 - **User preferences**: each user sets, with its default: language and time zone (the
   board's); short date format such as MM/DD/YYYY, and time format, 12 or 24 hour (the board's);
   theme (the default theme set in `hadv-config` and `hadv-config-gui`); terminal type:
