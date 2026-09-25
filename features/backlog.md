@@ -78,7 +78,8 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   theme, a file the sysop edited is found by comparing it with the shipped file's hash, and the
   sysop's copy is set aside and the sysop told. On legacy connections `/` starts a long command
   (such as `/SYSOP`) in every theme, and no theme binds `/` as a hotkey; with hotkeys on, typing
-  `/` switches to line entry until Enter. Depends on: scripting layer.
+  `/` switches to line entry until Enter. The sysop guide says editing a shipped theme is not
+  supported and shows how to fork one instead. Depends on: scripting layer.
 - **Certificates**: `hadv-cert` (TUI only) generates self-signed certificates and installs
   supplied ones; TLS Telnet, HTTPS and SSH host keys draw on it. ACME is not spoken by the
   engine; an ACME client uses `hadv-cert` to install what it obtained. Certificates reload
@@ -87,7 +88,9 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   uses perfect forward secrecy. SAN (Subject Alternative Name) and wildcard certificates are
   supported for all TLS services. High key sizes are supported and compromised key sizes
   rejected. The sysop configures TLS 1.2, TLS 1.3 and the key exchange in `hadv-config` and
-  `hadv-config-gui`; they default to secure settings. Depends on: configuration.
+  `hadv-config-gui`; they default to secure settings. The sysop guide shows how to set up an
+  ACME client (certbot or lego on Linux, win-acme on Windows) with a renewal hook that calls
+  `hadv-cert`. Depends on: configuration.
 - **Time zones and daylight saving**: times shown to callers and sysops follow daylight saving
   time where appropriate. Depends on: configuration.
 - **Event scheduler**: an event scheduler, like cron, that runs built-in actions and external
@@ -379,13 +382,45 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
 
 ## Operating the board
 
-- **Public API**: the board's HTTP interface for clients, with its OpenAPI description.
-  Depends on: web caller, accounts, RBAC. Touches the Portal and the load tester.
+- **Public API**: the board's HTTP interface for clients, with its OpenAPI description, separate
+  from the Admin API. Without a token a client has exactly the Guest role's permissions; with a
+  user's API token it has that user's permissions narrowed by the token's scopes, never more
+  than its owner. Every answer is filtered by the viewer as the terminal is (private profiles,
+  blocks). A token is scoped, expires, is shown once, stored hashed, revocable on its own and
+  listed with the user's sessions; creating one with write scopes needs a step-up. It serves
+  HeliosPortal and bot accounts. Depends on: web caller, accounts, RBAC. Touches the Portal and
+  the load tester.
+- **About this BBS**: an about screen (name, location, sysop, version, server and node count,
+  contact), drawn by the theme from facts it reads through `bbs.*`, and the same facts exported
+  as JSON for BBS directories and the public API. Required: the AGPL section 13 offer of the
+  board's source, reachable from the about screen on every front end, and a licence-compliance
+  page listing every dependency and its licence, generated at build time and served next to
+  the source offer. Uptime and last restart are for the sysop, in the WFC, not for users.
+  Depends on: scripting layer, public API.
 - **Waiting-for-Caller console**: `hadv-console` (TUI only; no CLI unless a use case appears)
   and `hadv-console-gui`, run on the server or remotely; long-lived tokens; the GUI minimises
   to the taskbar and can start minimised so it starts after login. It shows who is on which
-  node on which server, and their activity; it spawns the user editor. Depends on: remote
-  administration, classic text-mode interface.
+  node on which server, and their activity; it spawns the user editor. The Sysop, and no other
+  role, can spy on a connected user, seeing their output only and never their keystrokes; every
+  spy is audited, the terms of service tell users it can happen, and it may not work inside an
+  external program. A live log viewer filters by severity, server and correlation ID. A last
+  callers screen shows connection type, location and a new-user marker, and a connection log
+  shows source IP, front end and result. The main screen has indicators for the moderation
+  queue, pending users and unread feedback. Quick actions on a node: chat, spy, force logoff,
+  lock the node, send a message. Depends on: remote administration, classic text-mode
+  interface.
+- **Sysop messages and draining**: node-to-node messages and messages from the sysop to a user
+  arrive in the live session; a broadcast reaches every online user on every server, with an
+  optional shutdown countdown; a forced logoff of a user or a node shows the user the reason.
+  One mechanism, draining: draining a server stops new logins there while sessions finish or
+  the countdown ends; maintenance mode drains every server, shows the sysop's banner on every
+  front end and still lets the Sysop in; an update and a restart drain a server first. The
+  console can restart a server for a setting that only takes effect at start-up, with an
+  optional announced delay and a readiness check afterwards. A scheduled downtime notice shows
+  at login and in the web banner during a window the sysop sets. Do not disturb never blocks a
+  broadcast or a message from the sysop. Draining is not turning a service off, which closes
+  its listener; the console shows which applies. The theme draws live messages. Depends on:
+  Waiting-for-Caller console.
 - **Taskview**: in the WFC, see running tasks, with progress if the task supports it, and
   cancel a task if the task supports it, much as Nutanix Prism Central does. It is open to
   every part of the BBS, not only the event scheduler: a background virus scan, mail tossing
@@ -400,7 +435,13 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   servers that run it. Depends on: configuration, Waiting-for-Caller console; blocked on an
   amendment to ADV-002, whose console tokens change no settings.
 - **User editor**: `hadv-useredit` and `hadv-useredit-gui`, spawned from the console or run
-  alone. Depends on: RBAC, remote administration.
+  alone. `hadv-useredit` also has a CLI (suspend, unlock, reset, change role) for scripting and
+  recovery, signing in and taking secrets as the `hadv-config` CLI does. Depends on: RBAC,
+  remote administration.
+- **Allow-list self-lockout guard**: a change to the Admin API's allow list that would shut out
+  the connection making it is refused outright, with no override; the refusal says to make the
+  change from another admitted address or from the server's own host. Depends on: remote
+  administration.
 - **Server join by pairing code**: a sysop adds a server to the board: on the existing server,
   `hadv-config` shows a code; on the new server, `hadv-setup` asks for the existing server's
   address and the code; once the two agree, the new server receives what it needs over a
@@ -417,11 +458,18 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   answers. Depends on: servers.
 - **First-run setup**: `hadv-setup` (TUI and CLI; the CLI supports automation; runs only
   locally on the server) takes a fresh install to a running board:
-  sysop account with its second factor enrolled, listeners, database, certificates. Depends on:
-  servers, certificates, RBAC, second factor.
+  sysop account with its second factor enrolled, listeners, database, certificates. The sysop
+  guide says the sysop needs an authenticator app before starting. Depends on: servers,
+  certificates, RBAC, second factor.
 - **Installation**: Inno Setup (`setup.exe`) on Windows, WinGet wrapping it, RPM and DEB on
-  Linux, a container image built from a Dockerfile; the same result on every target. Depends
-  on: service lifecycle.
+  Linux, a container image built from a Dockerfile; the same result on every target. Where an
+  install sets up PostgreSQL, it is secured: SCRAM-SHA-256 passwords only, never `trust`; TLS
+  on; listening locally unless the board has more than one server; the per-server logins
+  ADV-001 requires. The container's compose file brings PostgreSQL up configured that way; RPM
+  and DEB recommend the distribution's package, configured by setup on first run; Windows does
+  not bundle it, and the guide points to PostgreSQL's own installer, whose result `hadv-setup`
+  checks. The sysop guide covers securing an existing PostgreSQL and lists every default port
+  for firewall rules. Depends on: service lifecycle.
 - **Database upgrades**: the database is backed up before every migration, by default; the
   sysop may skip the backup, with a loud warning. Restoring that backup to test it is
   configurable. After an install or an upgrade the schema is checked against what the
@@ -430,8 +478,17 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   release's signature and build-provenance attestation against the project's publishing
   identity before anything is applied (supply-chain protection built on the git and release
   infrastructure), rolling across a multi-server board one server at a time within the
-  one-version skew rule. Depends on: installation, servers, nodes and one board, database
-  upgrades.
+  one-version skew rule. The sysop picks off, notify only, download and notify, or download
+  and install; default notify only, and choosing off warns. RPM, DEB and Docker installs only
+  ever notify, since the package manager or Docker does the update; Inno Setup and WinGet
+  installs use the built-in updater. A release can be flagged critical, for a louder notice.
+  Stable and beta channels, beta opt-in and signed like every release. Across mixed update
+  methods, servers that update themselves go one at a time (drain, update, readiness check,
+  next), while package-managed servers are reported rather than driven: the console offers to
+  drain them and tracks each until it returns on the new version. One console view shows every
+  server's version. Migrations run once, on the first server to reach the new version. The
+  sysop guide warns against skipping a minor version. Depends on: installation, servers, nodes
+  and one board, database upgrades, sysop messages and draining.
 - **Configuration export and import**: the board's configuration (settings, areas, roles,
   networks; never secrets) exports as one file that diffs cleanly. An import lands as pending
   changes in the configuration tools, so the dry run is the pending list and applying it is the
@@ -450,6 +507,17 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   architecture (x86-64, ARM) and the operating system are included. The format is JSON.
   Metrics are local to each server and are never sent anywhere. It works hand in hand with the
   load tester. Depends on: servers, Telnet caller. Touches the load tester.
+- **Metrics**: Prometheus-format metrics on the Admin API listener, only through its allow list
+  and a token (an automation token with a read-only metrics scope), never public: sessions per
+  front end, login failures, posts, uploads, database pool saturation, tosser queue depth, door
+  launches and scheduler durations. Developer mode uses the same counters. Nothing is labelled
+  by user or IP address, only by front end, server and area. A Grafana dashboard ships in the
+  repository and is kept up to date with the metrics. Depends on: remote administration,
+  developer mode.
+- **fail2ban support**: failed-login and throttle log lines have a fixed, documented shape, a
+  stable contract changed only with a release note; fail2ban filter files ship in the docs, and
+  a test runs the shipped filter against real log output so the two cannot drift apart. The
+  same lines serve CrowdSec and Windows tools such as IPBan. Depends on: accounts and login.
 - **Language packs and string editors**: language packs carry metadata and versioning,
   mirroring themes, and are installed and updated through `hadv-config` and
   `hadv-config-gui`. `hadv-strings` and `hadv-strings-gui` edit the files. Depends on:
@@ -538,6 +606,13 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   block moderation: notices from the Sysop and moderators, bans and appeal replies always
   arrive, and moderators acting as moderators still see a blocked user's content. Depends on:
   accounts and login, private messages, message bases.
+- **Search**: a global search across every searchable area, or a search of one area, chosen
+  from where the user is; posts and files; a username search; filters `from:`, `area:`,
+  `before:`, `after:` and `has:attachment`. Result counts, "no results" and suggestions are
+  worked out only over what the user can read; a username search never finds a private
+  profile, except for a role that may see private users; results from users the searcher has
+  blocked never appear, and muted content stays hidden. Depends on: message bases, file bases,
+  RBAC, blocking and muting, rate limits.
 - **File transfer on classic connections**: upload and download protocols over Telnet and SSH
   sessions. Depends on: Telnet and SSH callers, file bases.
 - **SSH public-key login**: a user uploads a public key (on the web, or by file transfer on a
@@ -567,7 +642,8 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   configurable exponential backoff for connection and delivery retries. DKIM signing; ARC
   (Authenticated Received Chain); modern forwarding mechanics that preserve upstream
   validation (DKIM, SPF, DMARC). The goal is not for users to set up an email client and send
-  through the board; that may be a later feature. Depends on: private messages, sensitive data
+  through the board; that may be a later feature. The sysop guide covers the SPF, DKIM and
+  DMARC DNS records and how to check them. Depends on: private messages, sensitive data
   encrypted at rest.
 - **Sessions and devices**: a user sees their active sessions across Telnet, SSH, web and FTP
   (the front end, the IP address, the last activity) and ends one or all of them. A login from
