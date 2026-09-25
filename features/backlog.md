@@ -856,6 +856,16 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   daylight saving, theme packs, message bases, private messages, file transfer on classic
   connections, SMTP client, full-screen text editor, basic line text editor, terminal
   capabilities.
+- **Accessibility**: the BBS is as accessible as possible, to the level of WCAG 2.2 AA. On the
+  web side, WCAG 2.2 AA itself; on legacy connections and in the TUI and GUI tools, WCAG2ICT
+  (the W3C's guidance on applying WCAG to software that is not web) and EN 301 549, adapted
+  where a terminal needs it. A screen-reader mode for terminal callers: linear text with no
+  cursor positioning, numbered menus, the line editor, no art (its SAUCE title and description
+  instead, where there is one), and nothing conveyed by colour alone. Time limits and idle
+  timeouts can be extended or warned about; blinking, animation and baud-rate emulation can be
+  turned off. The shipped themes meet it; theme packs declare whether they do. Research the
+  existing standards before designing anything of our own. Depends on: user preferences,
+  theme packs, terminal negotiation, classic text-mode interface.
 - **Birthdays**: a birthday list, and a greeting at login on the user's own birthday. The list
   shows month and day only, never the year or an age; appearing in it is the user's choice,
   off by default even with a public profile, and a private profile never appears. The engine
