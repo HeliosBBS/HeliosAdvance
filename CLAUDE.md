@@ -90,7 +90,10 @@ push, the backlog included: a branch and a pull request every time, and a commit
 records the developer's words (a brief, a backlog line) is authored as the developer. A pull
 request for the developer to merge opens ready for review, never as a draft, and the session
 hands over the merge as `gh signoff <pr> <repository>` for each one, the repository named
-bare (`gh signoff 32 HeliosAdvance`): the alias adds the organisation itself.
+bare (`gh signoff 32 HeliosAdvance`): the alias adds the organisation itself. Without being
+asked, the session then watches each pull request it handed over until it merges or closes,
+and on a merge cleans up: the base branch checked out and pulled, the merged branch and its
+worktree removed locally.
 
 ## Rules
 
