@@ -63,13 +63,41 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   key-encryption key that join carries to each server); other sensitive fields encrypted in
   the database; keys managed. Depends on: servers.
 - **Scripting layer**: all BBS logic runs in theme scripts through a public `bbs.*` API with a
-  deprecation contract; the engine has no BBS logic of its own. Every script runs in a sandbox
-  with ceilings on instructions, memory and wall-clock time. Depends on: servers,
-  configuration.
-- **Theme packs**: scripts plus terminal text and graphics plus web code, in one pack. A
-  board installs several; each user picks the one they use, and a new user starts on the pack
-  the sysop has flagged as the default; the sysop installs, flags and disables packs. Two ship.
-  The modern theme is the fallback every other pack falls back to, cannot be deleted, is not
+  deprecation contract; the engine has no BBS logic of its own. Scripts own presentation and
+  flow; the engine enforces every permission, limit and audit entry behind `bbs.*`, whatever a
+  script does, and provides services to the scripts: for a user list, the engine supplies the
+  data and the script decides how it looks. Where the engine owns the timing, the theme owns
+  the look through a named hook. Screen pauses live in the engine, which counts every line sent
+  and honours the screen length and the user's pause preference, and calls a theme hook to draw
+  the prompt; the ban screen, the pre-login banner, live messages, the time-remaining warning
+  and the rate-limit notice work the same way. A hook that is missing, fails or hits a ceiling
+  falls back to a plain built-in version, and the keys a hook offers (continue, stop,
+  non-stop) mean what the engine says they mean. Every script runs in a sandbox with ceilings
+  on instructions, memory and wall-clock time. When a script fails, by a Lua error or a
+  ceiling alike: the first time, the caller sees a short plain line with a reference (the
+  session's correlation ID), never the error itself, and returns to the last menu that worked;
+  if the same script fails again in that session, that screen comes from the modern theme; if
+  the modern theme fails too, the session ends with a plain message. A failure leaves nothing
+  half-written. Every failure reaches the log and the console with the script, the line and
+  the reference, and the same failure hitting several callers in a short time notifies the
+  sysop; whether a broken pack is also disabled for new sessions is for the brainstorm.
+  Debugging: a pack check finds syntax errors, calls to `bbs.*` functions that do not exist,
+  and deprecated calls with the version they go away in, at install and on demand from
+  `hadv-config`; while the Sysop previews a pack, a failure shows them the full error instead
+  of the caller's fallback; `bbs.log` writes to the structured log, tagged with the pack, the
+  script and the session's reference, and shows in the console's live log viewer; the Sysop
+  can trace their own session (every script entered, hook called and `bbs.*` call, with
+  timings), never another caller's. A step-through debugger is revisited if someone asks.
+  Installing or updating a pack or a script needs no restart: new sessions get the new version
+  at once on every server, a running session keeps the version it started with until the
+  caller logs off, the Sysop previewing a pack can reload it on demand, and a new version that
+  fails the check is never offered, the last good one staying live.
+  Depends on: servers, configuration; its failure alert on sysop notification triggers; its
+  live log on Waiting-for-Caller console.
+- **Theme packs**: scripts plus terminal text and graphics plus web code, in one pack. A board
+  installs several; each user picks the one they use, and a new user starts on the pack the
+  sysop has flagged as the default; the sysop installs, flags and disables packs. Two ship. The
+  modern theme is the fallback every other pack falls back to, cannot be deleted, is not
   supported if edited; a sysop can disable it from selection and flag another pack as the
   default. Packs carry metadata and versioning, and are installed and updated through
   `hadv-config` and `hadv-config-gui`. Where theme files live (database or disk, and how every
@@ -78,14 +106,36 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   the user gets the variant for their character set: the user's set first, then the pack's
   default set, then the default theme. A pack's metadata names the minimum engine version it
   needs, and installing refuses a pack that needs a newer engine. Installing checks the pack,
-  reporting missing assets and listing what falls back to the default theme. The Sysop can use
-  a pack before it is offered to users, to preview it. A pack does not assume 80x25: 132
-  columns and tall terminals are part of the theme contract. When an update replaces a shipped
-  theme, a file the sysop edited is found by comparing it with the shipped file's hash, and the
-  sysop's copy is set aside and the sysop told. On legacy connections `/` starts a long command
-  (such as `/SYSOP`) in every theme, and no theme binds `/` as a hotkey; with hotkeys on, typing
-  `/` switches to line entry until Enter. The sysop guide says editing a shipped theme is not
-  supported and shows how to fork one instead. Depends on: scripting layer.
+  reporting missing assets and listing what falls back to the default theme. A missing asset is
+  never an error: the check never blocks installing or previewing a pack, only offering it to
+  users, and only for what would break for everyone (a syntax error, a call to a `bbs.*`
+  function that does not exist). A pack can name a parent pack and hold only what it changes,
+  screens and scripts alike, file by file: the board looks in the pack, then its parent, then
+  the modern theme, then a plain built-in fallback, so a sysop who changes three screens of the
+  classic theme uploads those three. A release that updates the parent reaches every pack built
+  on it, and the sysop's files are never touched. A child pack records the parent version it
+  was made against, and the check warns when a release changes a parent file the child
+  replaces. Only `bbs.*` and the named hooks are a contract, so a child's script that calls the
+  parent's internal functions may break when the parent changes, which the sysop guide says.
+  Copying a whole pack stays possible. Menus are data, not code, so a sysop who does not
+  program can change them: a menu is a file in the pack listing its items (hotkey, text, what
+  it does, who can see it), and the theme's menu script reads it and draws it. The menu editor
+  is a utility of its own, `hadv-menuedit` and `hadv-menuedit-gui`, shipping together, the GUI
+  written by the developer: it edits a pack's menus on disk, with no board running, or on a
+  board, where saving goes through the same install path and check as any pack. It adds,
+  removes, reorders and relabels items and changes their hotkeys and who can see them; what an
+  item does is picked from the actions the board offers, another menu, or a named script. Who
+  can see an item only hides it: the engine still checks the permission when the action runs. A
+  menu edited in a shipped pack is written to a child pack built on it, holding only that menu,
+  so the change survives every update; a menu's art is an ordinary asset of the pack. The Sysop
+  can use a pack before it is offered to users, to preview it. A pack does not assume 80x25:
+  132 columns and tall terminals are part of the theme contract. When an update replaces a
+  shipped theme, a file the sysop edited is found by comparing it with the shipped file's hash,
+  and the sysop's copy is set aside and the sysop told. On legacy connections `/` starts a long
+  command (such as `/SYSOP`) in every theme, and no theme binds `/` as a hotkey; with hotkeys
+  on, typing `/` switches to line entry until Enter. The sysop guide says editing a shipped
+  theme is not supported and shows how to build a child pack on it instead, or to copy it
+  whole. Depends on: scripting layer.
 - **Add-on modules**: sysop-installed Lua modules that add something to the board, such as a
   trivia game, a weather screen or a local-news menu, and work under any theme, so a sysop does
   not fork a theme for one addition. A module carries metadata and a minimum engine version, is
