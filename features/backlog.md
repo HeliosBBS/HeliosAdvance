@@ -613,40 +613,44 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   Co-Sysop, User, New User, Guest; required reading, yes) and General Discussion (read by Sysop,
   Co-Sysop, User, New User, Guest; post by Sysop, Co-Sysop, User, New User; moderate by Sysop,
   Co-Sysop). Depends on: conferences, account deletion, event scheduler.
+- **Reactions**: users react to posts, files and other content. Likes show as counts, while
+  dislikes are a private signal for ranking and moderation, never shown as a count. On the
+  terminal, reactions show as counts in the message header, with a hotkey to react. The
+  reaction set is configurable per theme. A banned or suspended user's reactions stop counting
+  while the restriction lasts and count again when it is lifted. Depends on: message bases.
 - **File bases**: file areas under conferences. Storage is a separate entry, since more than
-  file areas need it. Local directory and file paths are supported; the architecture must
-  handle availability across servers: a file local to one server may need to be transferred
-  temporarily to another, or marked OFFLINE when its owning server is unavailable. An OFFLINE
-  file stays listed and requestable (default: listed). Metadata is read from files that
-  support it (audio, images) when uploaded outside an archive; EXIF and other embedded
-  metadata are stripped from images on upload after being harvested into the file record
-  (default: strip). A free-file, no-ratio flag per file and per area. A new-files scan since
-  the last call, honouring the same follow graph as the new-message scan. File comments and
-  ratings by users who downloaded the file, using the same reaction model as social media
-  features. Resumable, chunked HTTP uploads on the web front end. Maximum upload size per file
-  and per area (off, or bytes; off). Upload description requirements: minimum length, extended
-  multi-line (default one line, at least 10 characters). An upload credit model: bytes, files
-  or ratio-exempt, with per-role and per-area overrides (default 3:1 by bytes). Download
-  counters per file, with most-downloaded and newest-files listings. Listing options: sort by
-  name, date, size or downloads; pattern filter; paged or full list. A tagged-file batch queue:
-  tag while browsing, download the batch at the session's end. Aborted-upload handling, with
-  resume on the next call for legacy protocols. Uploader attribution in listings, and a "my
-  uploads" view per user. A per-area file naming policy: long names or 8.3, case handling,
-  illegal-character rewriting. Ad-file injection: sysop-configured advertisement text stamped
-  as an extra file into outgoing archives, with its own enable, text and filename settings;
-  default off, and never into an archive that carries a signature. FILE_ID.DIZ and
-  DESCRIPT.ION are read into the description, as untrusted text: only the board's allowed
-  attribute codes are kept, every other escape sequence is stripped, the text is size-bounded,
-  and the archive is opened under the same limits as virus scanning. A ban list of filename
-  patterns. Per area, a maximum number of files and a purge by age, both off by default,
-  because a purge deletes uploads the sysop curated. Per role, a daily download byte limit and
-  a largest downloadable file. A file area can be a text library (G-files): its files cost no
-  ratio, open inline with the same stripping, and show the SAUCE title and author in the
+  file areas need it. Local directory and file paths are supported; the architecture must handle
+  availability across servers: a file local to one server may need to be transferred temporarily
+  to another, or marked OFFLINE when its owning server is unavailable. An OFFLINE file stays
+  listed and requestable (default: listed). Metadata is read from files that support it (audio,
+  images) when uploaded outside an archive; EXIF and other embedded metadata are stripped from
+  images on upload after being harvested into the file record (default: strip). A free-file,
+  no-ratio flag per file and per area. A new-files scan since the last call, honouring the same
+  follow graph as the new-message scan. File comments and ratings by users who downloaded the
+  file, using reactions. Resumable, chunked HTTP uploads on the web front end. Maximum upload
+  size per file and per area (off, or bytes; off). Upload description requirements: minimum
+  length, extended multi-line (default one line, at least 10 characters). An upload credit
+  model: bytes, files or ratio-exempt, with per-role and per-area overrides (default 3:1 by
+  bytes). Download counters per file, with most-downloaded and newest-files listings. Listing
+  options: sort by name, date, size or downloads; pattern filter; paged or full list. A
+  tagged-file batch queue: tag while browsing, download the batch at the session's end.
+  Aborted-upload handling, with resume on the next call for legacy protocols. Uploader
+  attribution in listings, and a "my uploads" view per user. A per-area file naming policy: long
+  names or 8.3, case handling, illegal-character rewriting. Ad-file injection: sysop-configured
+  advertisement text stamped as an extra file into outgoing archives, with its own enable, text
+  and filename settings; default off, and never into an archive that carries a signature.
+  FILE_ID.DIZ and DESCRIPT.ION are read into the description, as untrusted text: only the
+  board's allowed attribute codes are kept, every other escape sequence is stripped, the text is
+  size-bounded, and the archive is opened under the same limits as virus scanning. A ban list of
+  filename patterns. Per area, a maximum number of files and a purge by age, both off by
+  default, because a purge deletes uploads the sysop curated. Per role, a daily download byte
+  limit and a largest downloadable file. A file area can be a text library (G-files): its files
+  cost no ratio, open inline with the same stripping, and show the SAUCE title and author in the
   listing. Seeded areas: Sysop, always ID 1, editable but never deleted, viewed and downloaded
   by Sysop and Co-Sysop, open to uploads from every user without approval, receiving uploads
   meant for the sysop and every upload when "all uploads to Sysop" is on (default off); and
   Games and Miscellaneous, whose uploads need approval and where Guest downloads are off by
-  default. Depends on: conferences, account deletion, storage.
+  default. Depends on: conferences, account deletion, storage, reactions.
 - **Private messages**: user-to-user mail on the board. Folders Inbox, Sent and Trash by
   default, with Saved and folders of the user's own optional. CC and BCC. Mail to a role or
   group is a permission, held by Sysop and Co-Sysop by default; mail to the Sysop role
@@ -792,20 +796,19 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   each post links to its source. Depends on: message bases, link previews, event scheduler.
 - **Social media features**: ready for an early brainstorm. Following an area is new-scan
   participation (force on, default on or default off per area), so a new user's feed is not
-  empty; users follow other users; each profile has a microblog, extending one-liners; likes
-  show as counts, while dislikes are a private signal for ranking and moderation, never shown
-  as a count. Old-school and new-school parity: one store, two renderers, the web feed being
-  new-scan with another sort; chronological by default, ranking a toggle that never filters
-  below what new-scan would show; reactions as counts in the terminal header, with a hotkey;
-  direct messages are private mail; a boost is a cross-post to an area you moderate, a quote
-  post is quoting; hashtags are tags beside the area tree, listed in the terminal as virtual
-  areas, as are saved searches; sharing is the permalink shown by the message number; presence
-  is who's online with a status; avatars have an ANSI variant, treated as untrusted like DIZ
-  text; follow requests for locked accounts from day one, and the brainstorm defines locked
-  against private. Not carried over: infinite scroll, video, live streams, stories. Ranking is
-  a Lua script the sysop can swap; the reaction set is configurable per theme. A banned or
-  suspended user's social content is hidden while the restriction lasts and restored when it
-  is lifted. Depends on: message bases, private messages, who's online, search, notifications.
+  empty; users follow other users; each profile has a microblog, extending one-liners; reactions
+  decide the order in which each user sees things. Old-school and new-school parity: one store,
+  two renderers, the web feed being new-scan with another sort; chronological by default,
+  ranking a toggle that never filters below what new-scan would show; direct messages are
+  private mail; a boost is a cross-post to an area you moderate, a quote post is quoting;
+  hashtags are tags beside the area tree, listed in the terminal as virtual areas, as are saved
+  searches; sharing is the permalink shown by the message number; presence is who's online with
+  a status; avatars have an ANSI variant, treated as untrusted like DIZ text; follow requests
+  for locked accounts from day one, and the brainstorm defines locked against private. Not
+  carried over: infinite scroll, video, live streams, stories. Ranking is a Lua script the sysop
+  can swap. A banned or suspended user's social content is hidden while the restriction lasts
+  and restored when it is lifted. Depends on: message bases, private messages, who's online,
+  search, notifications, reactions.
 - **Events calendar**: a calendar of the board's events (game nights, network meetups, sysop
   chat hours, a door tournament), shown in each user's time zone; reminders come as
   notifications, and a scheduled post can announce an event. Creating events is a permission,
@@ -842,11 +845,10 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   and in total, netmail and email sent and received today and in total, netmail and email sent
   to sysops in total, uploads and upload bytes in total, downloads and download bytes in total.
   A day for the "today" counters is a day in the board's time zone. Also messages read, time
-  online, and likes given and received once social media features exist. A "your stats" page,
-  drawn by the theme, shows messages read, posts, time online, likes, files up and down, and
-  member since; another user's stats honour a private profile. Depends on: accounts and login,
-  message bases, private messages, file bases, time zones and daylight saving; the likes
-  counters on social media features.
+  online, and likes given and received. A "your stats" page, drawn by the theme, shows messages
+  read, posts, time online, likes, files up and down, and member since; another user's stats
+  honour a private profile. Depends on: accounts and login, message bases, private messages,
+  file bases, time zones and daylight saving, reactions.
 - **BBS statistics**: board-wide counters: logons, online time, netmail and email sent,
   feedback sent, new users, posts, uploads and upload bytes, downloads and download bytes
   today, and the maximum concurrent connections, in total and per connection type. Every
