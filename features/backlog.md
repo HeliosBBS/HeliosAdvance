@@ -52,6 +52,10 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   a board that never set that setting keeps the old value, stored as if the sysop had set it; a
   tightened default applies; both are listed for the sysop after the upgrade, beside any new
   permissions. Depends on: servers, remote administration, classic text-mode interface.
+- **Exempt sources**: a list of exempt sources, separate from the trusted proxy list, covers
+  addresses that stand for many callers (the HeliosSIP gateway, a load tester, a shared
+  address). Adding an exempt source warns loudly and needs the sysop's confirmation. Depends
+  on: IPv4 and IPv6, configuration.
 - **Sensitive data encrypted at rest**: user passwords stored as a hash (the previous system
   used Argon2id); a secret vault in the database that every server can read and decrypt,
   holding network passwords and other sensitive values each server needs (the previous system
@@ -147,7 +151,7 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   sysop sets; default ask. Depends on: nothing.
 - **Telnet caller**: a caller connects over Telnet to a node and reaches the theme's welcome;
   option negotiation; connection limits, per-source throttling (one mechanism shared by every
-  caller surface, honouring the exempt-source list from accounts and login), idle timeouts.
+  caller surface, honouring the exempt-source list), idle timeouts.
   Options negotiated: ECHO, SGA, BINARY, TTYPE, NAWS, NEW-ENVIRON and TSPEED; LINEMODE is
   refused, because hotkeys and lightbars need a character at a time. NEW-ENVIRON may fill in the
   login prompt but is never trusted to sign anyone in. Binary mode runs in both directions, so
@@ -155,7 +159,7 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   connection has dropped. Each listener can have a pre-login banner, drawn by the theme. Off by
   default. Default port TCP/23, default binding all addresses; whether it is on, the port and
   the binding all changeable in `hadv-config`. Depends on: servers, scripting layer, theme
-  packs, languages, terminal negotiation. Touches the load tester.
+  packs, languages, terminal negotiation, exempt sources. Touches the load tester.
 - **Accounts and login**: sign-up, login, sessions across servers, lockouts; a second factor
   when the account's role requires it. A user's profile is private by default, and they may make
   it public: a private user is hidden from search, profile views, who's-online, activity lists
@@ -176,22 +180,21 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   permanently until a sysop unlocks it (a Sysop account only by a Sysop). Failed sign-ins also
   slow the source down on every surface and every account: each failure from an address makes
   that address's next attempt wait longer, and past a threshold the address is refused for a
-  while; the server's own host is slowed but never refused. A list of exempt sources, separate
-  from the trusted proxy list, covers addresses that stand for many callers (the HeliosSIP
-  gateway, a load tester, a shared address). Every tunable here has a floor and a ceiling;
-  loosening any of them, or adding an exempt source, warns loudly and needs the sysop's
-  confirmation. The next successful sign-in shows how many failures there were and from where,
-  and when and from where the last successful sign-in came. Password policy: a minimum length,
-  optional character classes, a maximum age and a reuse history, defaulting to 12 characters, no
-  expiry and the last 5 remembered; a password may be at least 64 characters long, with spaces
-  and any Unicode. After a sysop resets a password, the user must change it at the next login
-  (default yes); nobody but account #1 itself can reset account #1's password, except the
+  while; the server's own host is slowed but never refused. This honours the exempt-source
+  list. Every tunable here has a floor and a ceiling; loosening any of them warns loudly and
+  needs the sysop's confirmation. The next successful sign-in shows how many failures there
+  were and from where, and when and from where the last successful sign-in came. Password
+  policy: a minimum length, optional character classes, a maximum age and a reuse history,
+  defaulting to 12 characters, no expiry and the last 5 remembered; a password may be at
+  least 64 characters long, with spaces and any Unicode. After a sysop resets a password, the
+  user must change it at the next login (default yes); nobody but account #1 itself can
+  reset account #1's password, except the
   last-resort recovery in account recovery. Concurrent logins: allow, deny, or deny on the same
   front end; default deny on the same front end, offering to end the old session. Changing a
   password ends every other session. The idle timeout is separate from the session time limit
   and set per front end, default 15 minutes. A setting, default yes, allows the Sysop to log in
   from outside sources rather than only from the WFC. Depends on: scripting layer, Telnet
-  caller.
+  caller, exempt sources.
 - **Breached-password check**: a new or changed password is checked against Have I Been
   Pwned's Pwned Passwords, sending only the first five characters of its SHA-1 hash and nothing
   else, so the service never sees the password. On by default; the sysop chooses warn or
@@ -288,6 +291,9 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   they apply to web sessions is decided in the brainstorm. A time bank, built into the board
   rather than a door, lets a user deposit and withdraw daily time, with caps per role; using it
   is a permission every role holds by default except New User and Guest. Depends on: RBAC.
+- **Watched words**: user content is checked against watched words, each with an action of
+  block, send to the moderation queue, or tag silently; none seeded. Depends on:
+  configuration; its queue action on content moderation.
 - **Who's online**: a list of who is currently online on the BBS; see classic BBSes for
   examples. A user whose profile is private does not show up in who's online, and a user does
   not see someone they have blocked. Sysop and Co-Sysop hold a permission to see everyone,
@@ -295,7 +301,8 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   idle time, per front end; users see coarse activity (the front end, in a door, reading
   messages), while the sysop's console keeps the full detail, and do not disturb shows here. The
   status line is user content: length-limited, checked against watched words and reportable.
-  Depends on: role-based access control; its status-line reporting on content moderation.
+  Depends on: role-based access control, watched words; its status-line reporting on content
+  moderation.
 - **Account deletion**: a user can delete their own account after a confirmation (typing
   something, or their second factor); account #1, the main sysop account, cannot delete itself.
   Deleting an account, whether the user, the Sysop or maintenance does it, puts it in a virtual
@@ -446,11 +453,12 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
 ## Operating the board
 
 - **Public API**: the board's HTTP interface for clients, with its OpenAPI description, separate
-  from the Admin API. Without a token a client has exactly the Guest role's permissions; with a
-  user's API token it has that user's permissions narrowed by the token's scopes, never more
-  than its owner. Every answer is filtered by the viewer as the terminal is (private profiles,
-  blocks). A token is scoped, expires, is shown once, stored hashed, revocable on its own and
-  listed with the user's sessions; creating one with write scopes needs a step-up. It serves
+  from the Admin API. It is served by the web caller and is on or off with it. Without a
+  token a client has exactly the Guest role's permissions; with a user's API token it has
+  that user's permissions narrowed by the token's scopes, never more than its owner. Every
+  answer is filtered by the viewer as the terminal is (private profiles, blocks). A token is
+  scoped, expires, is shown once, stored hashed, revocable on its own and listed with the
+  user's sessions; creating one with write scopes needs a step-up. It serves
   HeliosPortal and bot accounts. Which web addresses may call it from a browser on another
   origin (CORS) is a sysop setting: HeliosPortal's official address is on the list by default,
   since mobile is first-class, and a cross-origin request carries an API token, never the
@@ -642,14 +650,14 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   messages keeping their prior bodies, readers seeing an "edited" marker and moderators the
   diff; slow mode, one post per user per N minutes (off); auto-close inactive threads (off, or
   days; off); pinned messages with an optional expiry date, set by the area's moderators;
-  watched words with an action of block, send to the moderation queue, or tag silently (none
-  seeded); required approval (no). Moderator thread tools: split, merge, move (leaving a stub),
-  close. Maximum message size in bytes or lines (64 KB; networked areas clamp to the network's
-  limit). Attachment policy: off, allowed, or allowed with approval, with a maximum attachment
-  size and count. An origin line or network tagline per area, with a board-wide default. A
-  read-only, archived state: no new posts, existing ones readable (off). Message base packing
-  and renumbering as a maintenance job, safe against in-flight readers, and beside it an
-  integrity check that rebuilds an area's pointers and indexes, equally safe, reporting its
+  watched words; required approval (no). Moderator thread tools: split, merge, move (leaving a
+  stub), close. Maximum message size in bytes or lines (64 KB; networked areas clamp to the
+  network's limit). Attachment policy: off, allowed, or allowed with approval, with a maximum
+  attachment size and count. An origin line or network tagline per area, with a board-wide
+  default. A read-only, archived state: no new posts, existing ones readable (off). Message
+  base packing and renumbering as a maintenance job, safe against in-flight readers, and
+  beside it an integrity check that rebuilds an area's pointers and indexes, equally safe,
+  reporting its
   progress in Taskview. Area aliases or short names usable in menu commands and the `area:`
   search filter. Default new-scan participation: force on, default on, or default off (default
   on). Area sort order and numbering independent of creation order, shared with the web front
@@ -659,12 +667,14 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   initial setup and freely editable or deletable afterwards: Announcement (read by Sysop,
   Co-Sysop, User, New User, Guest; required reading, yes) and General Discussion (read by Sysop,
   Co-Sysop, User, New User, Guest; post by Sysop, Co-Sysop, User, New User; moderate by Sysop,
-  Co-Sysop). Depends on: conferences, account deletion, event scheduler.
+  Co-Sysop). Depends on: conferences, account deletion, event scheduler, watched words; its
+  approval settings on content moderation.
 - **Reactions**: users react to posts, files and other content. Likes show as counts, while
   dislikes are a private signal for ranking and moderation, never shown as a count. On the
   terminal, reactions show as counts in the message header, with a hotkey to react. The
   reaction set is configurable per theme. A banned or suspended user's reactions stop counting
-  while the restriction lasts and count again when it is lifted. Depends on: message bases.
+  while the restriction lasts and count again when it is lifted. Depends on: message bases;
+  its suspended-user rule on bans, suspensions and appeals.
 - **File bases**: file areas under conferences. Each area names the roles that can view it,
   download, upload and moderate, and whether uploads need approval, as message areas name
   theirs; defaults: view and download Sysop, Co-Sysop, User and New User, upload Sysop,
@@ -700,7 +710,8 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   by Sysop and Co-Sysop, open to uploads from every user without approval, receiving uploads
   meant for the sysop and every upload when "all uploads to Sysop" is on (default off); and
   Games and Miscellaneous, whose uploads need approval and where Guest downloads are off by
-  default. Depends on: conferences, account deletion, storage, reactions.
+  default. Depends on: conferences, account deletion, storage, reactions; its upload approval
+  on content moderation.
 - **Private messages**: user-to-user mail on the board. Folders Inbox, Sent and Trash by
   default, with Saved and folders of the user's own optional. CC and BCC. Mail to a role or
   group is a permission, held by Sysop and Co-Sysop by default; mail to the Sysop role
@@ -862,7 +873,7 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   carried over: infinite scroll, video, live streams, stories. Ranking is a Lua script the sysop
   can swap. A banned or suspended user's social content is hidden while the restriction lasts
   and restored when it is lifted. Depends on: message bases, private messages, who's online,
-  search, notifications, reactions.
+  search, notifications, reactions; its suspended-user rule on bans, suspensions and appeals.
 - **Events calendar**: a calendar of the board's events (game nights, network meetups, sysop
   chat hours, a door tournament), shown in each user's time zone; reminders come as
   notifications, and a scheduled post can announce an event. Creating events is a permission,
@@ -969,7 +980,8 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   checked against watched words, with untrusted escape sequences stripped; their colour codes
   are converted or stripped per network on export, as the attribute codes entry does for
   bodies, and taglines follow the network's convention. Per area, a setting strips signatures
-  on network export. Depends on: message bases, user preferences, attribute codes.
+  on network export. Depends on: message bases, user preferences, attribute codes, watched
+  words.
 - **Voting booth**: a voting booth that allows polling. A poll is a question with up to 10
   replies and an optional write-in, single-choice or multiple-choice (pick N); a poll can be
   made required at login. RBAC decides who can create polls, set one required, vote, see the
@@ -1186,7 +1198,7 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   a private user does not appear and only what a profile makes public is shown, the console
   keeping the full detail. All of it is user content: length limits, watched words,
   reportable. A rumor is anonymous to users, not to staff. Depends on: scripting layer, who's
-  online, content moderation.
+  online, content moderation, watched words.
 - **BBS list**: a directory of other systems (Telnet, SSH, web) that users keep, exported as
   JSON and RSS, with the compiled network nodelists and BBS lists browsable and searchable
   from the same screen. A new entry goes to the moderation queue, and its submitter can edit
