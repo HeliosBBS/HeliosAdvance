@@ -256,30 +256,30 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   not see someone they have blocked. Sysop and Co-Sysop hold a permission to see everyone,
   bypassing a private profile or a block. Each caller shows a status line they set and their
   idle time, per front end; users see coarse activity (the front end, in a door, reading
-  messages), while the sysop's console keeps the full detail, and do not disturb shows here.
-  The status line is user content: length-limited, checked against watched words and
-  reportable. Depends on: role-based access control.
+  messages), while the sysop's console keeps the full detail, and do not disturb shows here. The
+  status line is user content: length-limited, checked against watched words and reportable.
+  Depends on: role-based access control; its status-line reporting on content moderation.
 - **Account deletion**: a user can delete their own account after a confirmation (typing
-  something, or their second factor); account #1, the main sysop account, cannot delete
-  itself. Deleting an account, whether the user, the Sysop or maintenance does it, puts it in
-  a virtual deleted state, like a recycle bin, for a period configurable in `hadv-config` and
+  something, or their second factor); account #1, the main sysop account, cannot delete itself.
+  Deleting an account, whether the user, the Sysop or maintenance does it, puts it in a virtual
+  deleted state, like a recycle bin, for a period configurable in `hadv-config` and
   `hadv-config-gui` up to a ceiling of 30 days, before it is deleted permanently. Maintenance
   deletes an account that has been inactive for longer than its role's Maximum Days of User
   Inactivity, a setting every role carries and the sysop can change on it: the Sysop role
   defaults to unlimited, Co-Sysop to 365 days, User to 180, New User to 30, and a new role to
-  180. Account #1, the main sysop account, is never deleted for inactivity. While in the
-  virtual deleted state the account is hidden, blocked from login and absent from the user list; its
-  username and email address cannot be reused by a new user; the Sysop or a Co-Sysop can
-  restore it. When the account is deleted permanently, any messages in its mailbox are
-  deleted and cannot be restored, and its username and email address may be reused, subject
-  to the former-handle period. The Sysop can delete an account permanently straight from the
-  virtual deleted state, to comply with the EU GDPR; its posts, uploads and other data then
-  show the placeholder [Deleted User]. Research whether and how the GDPR applies to the audit
-  log and other logs. An email warns the user N days before their role's inactivity limit,
-  default 14, when the board can send email and the account has an address; it is plain, with
-  no link asking for a password, just "log in to keep your account". The sysop turns the
-  warning on or off in the configuration tools, default on. Depends on: accounts and login,
-  RBAC, event scheduler.
+  180. Account #1, the main sysop account, is never deleted for inactivity. While in the virtual
+  deleted state the account is hidden, blocked from login and absent from the user list; its
+  username and email address cannot be reused by a new user; the Sysop or a Co-Sysop can restore
+  it. When the account is deleted permanently, any messages in its mailbox are deleted and
+  cannot be restored, and its username and email address may be reused, subject to the
+  former-handle period. The Sysop can delete an account permanently straight from the virtual
+  deleted state, to comply with the EU GDPR; its posts, uploads and other data then show the
+  placeholder [Deleted User]. Research whether and how the GDPR applies to the audit log and
+  other logs. An email warns the user N days before their role's inactivity limit, default 14,
+  when the board can send email and the account has an address; it is plain, with no link asking
+  for a password, just "log in to keep your account". The sysop turns the warning on or off in
+  the configuration tools, default on. Depends on: accounts and login, RBAC, event scheduler;
+  its inactivity email on the SMTP client.
 - **Second factor**: TOTP (RFC 6238), with self-service enrolment in text mode and by QR code
   on connections that support it; passkeys where the surface allows; required per role; the
   initial #1 Sysop enrols during first-run setup. Ten single-use recovery codes, stored hashed,
@@ -331,7 +331,7 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   JavaScript. Every message, file and profile has a stable permalink that survives moving an
   area, with Open Graph metadata for link previews only on content a Guest can see; a link the
   viewer cannot read gets the same not-found answer as one that does not exist. Depends on:
-  scripting layer, theme packs, certificates.
+  scripting layer, theme packs, certificates; its permalinks on message bases and file bases.
 - **Terminal-in-browser rendering**: the classic theme's terminal experience rendered in the
   browser: ANSI with animation and ANSI music. Web users can also play classic ANSI DOS games,
   carried over a WebSocket. The screen is not locked to a fixed 80x25 size that looks tiny on a
@@ -396,8 +396,8 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   than its owner. Every answer is filtered by the viewer as the terminal is (private profiles,
   blocks). A token is scoped, expires, is shown once, stored hashed, revocable on its own and
   listed with the user's sessions; creating one with write scopes needs a step-up. It serves
-  HeliosPortal and bot accounts. Depends on: web caller, accounts, RBAC. Touches the Portal and
-  the load tester.
+  HeliosPortal and bot accounts. Depends on: web caller, accounts, RBAC; its tokens on sessions
+  and devices and step-up re-authentication. Touches the Portal and the load tester.
 - **About this BBS**: an about screen (name, location, sysop, version, server and node count,
   contact), drawn by the theme from facts it reads through `bbs.*`, and the same facts exported
   as JSON for BBS directories and the public API. Required: the AGPL section 13 offer of the
@@ -656,15 +656,15 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   block moderation: notices from the Sysop and moderators, bans and appeal replies always
   arrive, and moderators acting as moderators still see a blocked user's content. Depends on:
   accounts and login, private messages, message bases.
-- **Search**: a global search across every searchable area, or a search of one area, chosen
-  from where the user is; posts and files; a username search; filters `from:`, `area:`,
-  `before:`, `after:` and `has:attachment`. Result counts, "no results" and suggestions are
-  worked out only over what the user can read; a username search never finds a private
-  profile, except for a role that may see private users; results from users the searcher has
-  blocked never appear, and muted content stays hidden. A saved search can notify its owner of
-  new matches, which covers keyword watches: only for posts the user can read, never from a
-  muted area or a blocked user, and with a cap on such searches per user. Depends on: message
-  bases, file bases, RBAC, blocking and muting, rate limits.
+- **Search**: a global search across every searchable area, or a search of one area, chosen from
+  where the user is; posts and files; a username search; filters `from:`, `area:`, `before:`,
+  `after:` and `has:attachment`. Result counts, "no results" and suggestions are worked out only
+  over what the user can read; a username search never finds a private profile, except for a
+  role that may see private users; results from users the searcher has blocked never appear, and
+  muted content stays hidden. A saved search can notify its owner of new matches, which covers
+  keyword watches: only for posts the user can read, never from a muted area or a blocked user,
+  and with a cap on such searches per user. Depends on: message bases, file bases, RBAC,
+  blocking and muting, rate limits; notifying saved searches on notifications.
 - **File transfer on classic connections**: upload and download protocols over Telnet and SSH
   sessions. A protocol registry: XModem, XModem-1K, YModem, YModem-G and ZModem, with HTTP(S)
   and FTP as entries of their own; each protocol is on or off and available per role, default
@@ -809,8 +809,9 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   A day for the "today" counters is a day in the board's time zone. Also messages read, time
   online, and likes given and received once social media features exist. A "your stats" page,
   drawn by the theme, shows messages read, posts, time online, likes, files up and down, and
-  member since; another user's stats honour a private profile. Depends on: accounts and
-  login, message bases, private messages, file bases, time zones and daylight saving.
+  member since; another user's stats honour a private profile. Depends on: accounts and login,
+  message bases, private messages, file bases, time zones and daylight saving; the likes
+  counters on social media features.
 - **BBS statistics**: board-wide counters: logons, online time, netmail and email sent,
   feedback sent, new users, posts, uploads and upload bytes, downloads and download bytes
   today, and the maximum concurrent connections, in total and per connection type. Every
@@ -828,34 +829,33 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   provides system news with a per-user last-read marker, so news shows when it has changed, a
   first-logoff flag and today's statistics, through `bbs.*`. Depends on: theme packs, user
   statistics, BBS statistics.
-- **User preferences**: each user sets, with its default: language and time zone (the
-  board's); short date format such as MM/DD/YYYY, and time format, 12 or 24 hour (the board's);
-  theme (the default theme set in `hadv-config` and `hadv-config-gui`); terminal type:
-  auto-detect, extended ASCII, ANSI or RIP (auto-detect); colour: auto-detect, yes or no
-  (auto-detect); screen length and width: auto-detect or a number (auto-detect); expert mode,
-  menus hidden unless `?` is pressed (no); pause at the end of each screen (yes); forward all
-  netmail and email to the user's forwarding destination (no), with the forwarding format, the
-  full message or a notification only (notification only); clear screen between messages (no);
-  ask for a new message scan (no); remember the current message area (no) and file area (no);
-  default download protocol, from the protocols the system defines (ZModem); hang up after a
-  file transfer (no); editor: full-screen or line, on classic connections only (full-screen);
-  message reading order: forward, reverse or threaded (forward); show signature on posts
-  (yes); private profile (yes, as accounts and login describes); menu style, lightbar, classic
-  hotkey or numbered, offered only where the user's theme draws it (the theme's); hotkeys, a
-  single key without Enter (yes); quote style and prefix (`> ` with initials); messages and
-  files per screen (screen length minus 2); available for chat or do not disturb (available),
-  which blocks chat requests and pages from users but not the Sysop's break-in, and is
-  separate from quiet hours. The forwarding destination is a network and an address: the user
-  picks from every network the board supports, the Internet included, and types the address,
-  which that network's own rules check and which holds everything the network needs to reach
-  them (for FTN a name and a node, checked against the nodelist; for WWIV a number or a name at
-  a node). An internet forwarding address is confirmed before any mail goes to it; there is one
-  destination per user; forwarding over a BBS network warns once that netmail passes through
-  hubs as plain text. Some of these may be better stored in a separate table linked to the
-  user. Depends on: language choice, time zones and
-  daylight saving, theme packs, message bases, private messages, file transfer on classic
-  connections, SMTP client, full-screen text editor, basic line text editor, terminal
-  capabilities.
+- **User preferences**: each user sets, with its default: language and time zone (the board's);
+  short date format such as MM/DD/YYYY, and time format, 12 or 24 hour (the board's); theme (the
+  default theme set in `hadv-config` and `hadv-config-gui`); terminal type: auto-detect,
+  extended ASCII, ANSI or RIP (auto-detect); colour: auto-detect, yes or no (auto-detect);
+  screen length and width: auto-detect or a number (auto-detect); expert mode, menus hidden
+  unless `?` is pressed (no); pause at the end of each screen (yes); forward all netmail and
+  email to the user's forwarding destination (no), with the forwarding format, the full message
+  or a notification only (notification only); clear screen between messages (no); ask for a new
+  message scan (no); remember the current message area (no) and file area (no); default download
+  protocol, from the protocols the system defines (ZModem); hang up after a file transfer (no);
+  editor: full-screen or line, on classic connections only (full-screen); message reading order:
+  forward, reverse or threaded (forward); show signature on posts (yes); private profile (yes,
+  as accounts and login describes); menu style, lightbar, classic hotkey or numbered, offered
+  only where the user's theme draws it (the theme's); hotkeys, a single key without Enter (yes);
+  quote style and prefix (`> ` with initials); messages and files per screen (screen length
+  minus 2); available for chat or do not disturb (available), which blocks chat requests and
+  pages from users but not the Sysop's break-in, and is separate from quiet hours. The
+  forwarding destination is a network and an address: the user picks from every network the
+  board supports, the Internet included, and types the address, which that network's own rules
+  check and which holds everything the network needs to reach them (for FTN a name and a node,
+  checked against the nodelist; for WWIV a number or a name at a node). An internet forwarding
+  address is confirmed before any mail goes to it; there is one destination per user; forwarding
+  over a BBS network warns once that netmail passes through hubs as plain text. Some of these
+  may be better stored in a separate table linked to the user. Depends on: language choice, time
+  zones and daylight saving, theme packs, message bases, private messages, file transfer on
+  classic connections, SMTP client, full-screen text editor, basic line text editor, terminal
+  capabilities; forwarding to a network address on mail networks.
 - **Accessibility**: the BBS is as accessible as possible, to the level of WCAG 2.2 AA. On the
   web side, WCAG 2.2 AA itself; on legacy connections and in the TUI and GUI tools, WCAG2ICT
   (the W3C's guidance on applying WCAG to software that is not web) and EN 301 549, adapted
