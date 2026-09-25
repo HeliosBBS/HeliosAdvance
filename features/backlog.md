@@ -80,6 +80,12 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   (such as `/SYSOP`) in every theme, and no theme binds `/` as a hotkey; with hotkeys on, typing
   `/` switches to line entry until Enter. The sysop guide says editing a shipped theme is not
   supported and shows how to fork one instead. Depends on: scripting layer.
+- **Add-on modules**: sysop-installed Lua modules that add something to the board, such as a
+  trivia game, a weather screen or a local-news menu, and work under any theme, so a sysop does
+  not fork a theme for one addition. A module carries metadata and a minimum engine version, is
+  installed, updated and checked through `hadv-config` and `hadv-config-gui` as theme packs
+  are, runs in the same sandbox with the same ceilings, and reaches the board only through
+  `bbs.*`; using one is a permission per module. Depends on: scripting layer, theme packs.
 - **Certificates**: `hadv-cert` (TUI only) generates self-signed certificates and installs
   supplied ones; TLS Telnet, HTTPS and SSH host keys draw on it. ACME is not spoken by the
   engine; an ACME client uses `hadv-cert` to install what it obtained. Certificates reload
@@ -455,6 +461,10 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   the connection making it is refused outright, with no override; the refusal says to make the
   change from another admitted address or from the server's own host. Depends on: remote
   administration.
+- **Permission preview**: the sysop sees the board as a role, or as a user, sees it, read-only:
+  which conferences, areas, files and commands are open to them, and why one is not. It shows
+  what they can see and never acts as them. Depends on: role-based access control,
+  configuration.
 - **Server join by pairing code**: a sysop adds a server to the board: on the existing server,
   `hadv-config` shows a code; on the new server, `hadv-setup` asks for the existing server's
   address and the code; once the two agree, the new server receives what it needs over a
@@ -508,6 +518,11 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   normal apply, with the same checks and loud warnings as a change typed by hand; Sysop only.
   An import lists the secrets to enter again. For now, an import goes to the same board or a
   fresh one. Depends on: configuration.
+- **Security checkup**: a screen in `hadv-config` and `hadv-config-gui` listing every setting
+  loosened from its secure default (a role without a required second factor, plain FTP on, a
+  wide ban range, HSTS off, a listener without TLS and the like), each with who changed it and
+  when, so a sysop sees the whole picture long after each loosening's warning. It changes
+  nothing itself. Depends on: configuration.
 - **Fault-tolerant database, documented**: a sysop guide chapter on running the board behind a
   PostgreSQL proxy that provides failover and pooling (Pgpool-II, or PgBouncer with Patroni
   and HAProxy); the engine needs nothing special. The proxy must pool in session mode: the
@@ -765,6 +780,10 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   when the link is posted, and caches the result, never fetching on view; and treats what it
   fetches as untrusted, stripping escape sequences. The same fetcher serves any later check
   that a BBS list entry is alive. Depends on: message bases.
+- **Feed areas**: a read-only message area filled from an RSS or Atom feed the sysop adds, such
+  as tech news or a club's blog, fetched on a schedule by the link previews' fetcher and under
+  its rules; the feed's text is untrusted, only what the feed itself provides is carried, and
+  each post links to its source. Depends on: message bases, link previews, event scheduler.
 - **Social media features**: ready for an early brainstorm. Following an area is new-scan
   participation (force on, default on or default off per area), so a new user's feed is not
   empty; users follow other users; each profile has a microblog, extending one-liners; likes
@@ -781,6 +800,11 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   a Lua script the sysop can swap; the reaction set is configurable per theme. A banned or
   suspended user's social content is hidden while the restriction lasts and restored when it
   is lifted. Depends on: message bases, private messages, who's online, search, notifications.
+- **Events calendar**: a calendar of the board's events (game nights, network meetups, sysop
+  chat hours, a door tournament), shown in each user's time zone; reminders come as
+  notifications, and a scheduled post can announce an event. Creating events is a permission,
+  held by Sysop and Co-Sysop by default. Depends on: notifications, scheduled posts,
+  role-based access control.
 - **SMTP server (receiving email)**: the board receives email for its users. Strict anti-relay
   rules: accept only email for local users and local domains. Port binding and listening
   addresses configurable. Maximum simultaneous connections configurable, default 100, shared
