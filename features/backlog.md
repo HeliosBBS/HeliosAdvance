@@ -183,12 +183,13 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   optional character classes, a maximum age and a reuse history, defaulting to 12 characters, no
   expiry and the last 5 remembered; a password may be at least 64 characters long, with spaces
   and any Unicode. After a sysop resets a password, the user must change it at the next login
-  (default yes); nobody but account #1 itself can reset account #1's password. Concurrent
-  logins: allow, deny, or deny on the same front end; default deny on the same front end,
-  offering to end the old session. Changing a password ends every other session. The idle
-  timeout is separate from the session time limit and set per front end, default 15 minutes. A
-  setting, default yes, allows the Sysop to log in from outside sources rather than only from
-  the WFC. Depends on: scripting layer, Telnet caller.
+  (default yes); nobody but account #1 itself can reset account #1's password, except the
+  last-resort recovery in account recovery. Concurrent logins: allow, deny, or deny on the same
+  front end; default deny on the same front end, offering to end the old session. Changing a
+  password ends every other session. The idle timeout is separate from the session time limit
+  and set per front end, default 15 minutes. A setting, default yes, allows the Sysop to log in
+  from outside sources rather than only from the WFC. Depends on: scripting layer, Telnet
+  caller.
 - **Breached-password check**: a new or changed password is checked against Have I Been
   Pwned's Pwned Passwords, sending only the first five characters of its SHA-1 hash and nothing
   else, so the service never sees the password. On by default; the sysop chooses warn or
@@ -323,8 +324,17 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   gets their account back. The Sysop, or a Co-Sysop within their scope, can clear a user's
   second factor; if the role requires one, the user enrols again at the next login. Clearing it
   is audited and the user is told by inbox and email; a Co-Sysop cannot clear a Sysop's or a
-  Co-Sysop's, and nobody but account #1 itself can clear account #1's. The sysop guide says to
-  verify who is asking first. Depends on: accounts and login, second factor.
+  Co-Sysop's, and nobody but account #1 itself can clear account #1's, except the last-resort
+  recovery below. The sysop guide says to verify who is asking first. As a last resort, when
+  account #1 has lost its password, its authenticator and its recovery codes, `hadv-setup` on
+  the server's own host recovers it: it takes the database administrator credential
+  interactively, as first-run setup does, never stored or logged, so a server's own login or a
+  stolen disk is never enough; it sets a temporary password that must be changed at the next
+  login, clears the second factor so the Sysop role forces enrolment again, ends every session
+  and revokes every token, and changes nothing else; it acts on account #1 alone; it writes an
+  audit entry and tells #1's email address and every other Sysop-role account. This widens
+  ADV-001's rule that the local operator changes only what restores connectivity, so the
+  brainstorm amends ADV-001. Depends on: accounts and login, second factor.
 - **App passwords**: protocols that cannot do a second factor (FTP and FTPS, and later
   newsreader and mail-client access) refuse the main password of an account with a second
   factor and take an app password instead: named, limited to the protocols it is for, shown
