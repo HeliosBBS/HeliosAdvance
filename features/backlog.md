@@ -258,24 +258,21 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   and who got them. The direction for the brainstorm: only account #1 itself, or the local
   operator at the server's own host, can change account #1's password, second factor, email
   address, SSH keys or role; removing a key or ending a session, which can only lock #1 out, is
-  not barred. Open for the brainstorm: handing the board to a new sysop, when account #1 carries
-  the old sysop's handle and posts, by transferring ownership to another Sysop account or by
-  handing over #1's credentials. Seeded roles, by fixed ID because names are editable: 1 Sysop,
-  2 Co-Sysop, 3 User, 4 Guest, 5 New User. Sysop: super user, unrestricted global access; cannot
-  be deleted; display name changeable, access not editable. Co-Sysop: limited administration
-  (users, file areas, message bases); cannot touch system configuration, promote anyone to Sysop
-  or Co-Sysop, take over Sysop or Co-Sysop accounts, or lock out a Sysop; cannot be deleted;
-  editable (display name, additional restrictions). User: regular registered users; cannot be
-  deleted; editable. Guest: not signed in; cannot be deleted; editable. New User: baseline
-  probationary access; can be deleted; fully editable. Account #1 is always the main sysop
-  account and owner of the system. The Sysop and Co-Sysop roles require 2FA by default; each
-  role's second factor is Required, Optional or Disabled. Every permission can be granted to
-  other roles, except those a brief fixes to the Sysop role or to account #1. A role in use
-  cannot be deleted; the refusal names what uses it. Guest, on the web, reads public areas and
-  cannot post, upload or run doors; Guest downloads only where the sysop turns that on for an
-  area, off by default; Guest over Telnet, SSH and FTP may come later. Sysop and Co-Sysop hold
-  the permission to see everyone in who's-online, private or blocked, by default. Depends on:
-  accounts and login.
+  not barred. Seeded roles, by fixed ID because names are editable: 1 Sysop, 2 Co-Sysop, 3 User,
+  4 Guest, 5 New User. Sysop: super user, unrestricted global access; cannot be deleted; display
+  name changeable, access not editable. Co-Sysop: limited administration (users, file areas,
+  message bases); cannot touch system configuration, promote anyone to Sysop or Co-Sysop, take
+  over Sysop or Co-Sysop accounts, or lock out a Sysop; cannot be deleted; editable (display
+  name, additional restrictions). User: regular registered users; cannot be deleted; editable.
+  Guest: not signed in; cannot be deleted; editable. New User: baseline probationary access; can
+  be deleted; fully editable. Account #1 is always the main sysop account and owner of the
+  system. The Sysop and Co-Sysop roles require 2FA by default; each role's second factor is
+  Required, Optional or Disabled. Every permission can be granted to other roles, except those a
+  brief fixes to the Sysop role or to account #1. A role in use cannot be deleted; the refusal
+  names what uses it. Guest, on the web, reads public areas and cannot post, upload or run
+  doors; Guest downloads only where the sysop turns that on for an area, off by default; Guest
+  over Telnet, SSH and FTP may come later. Sysop and Co-Sysop hold the permission to see
+  everyone in who's-online, private or blocked, by default. Depends on: accounts and login.
 - **Rate limits**: posting, private mail, uploads, search and registration are each limited
   per account and per IP address, by one mechanism on every front end, with a clear "try again
   in N seconds". The defaults are generous and roles can override them; Sysop and Co-Sysop get
@@ -454,8 +451,12 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   than its owner. Every answer is filtered by the viewer as the terminal is (private profiles,
   blocks). A token is scoped, expires, is shown once, stored hashed, revocable on its own and
   listed with the user's sessions; creating one with write scopes needs a step-up. It serves
-  HeliosPortal and bot accounts. Depends on: web caller, accounts, RBAC; its tokens on sessions
-  and devices and step-up re-authentication. Touches the Portal and the load tester.
+  HeliosPortal and bot accounts. Which web addresses may call it from a browser on another
+  origin (CORS) is a sysop setting: HeliosPortal's official address is on the list by default,
+  since mobile is first-class, and a cross-origin request carries an API token, never the
+  board's session cookie; any other address is added by the sysop, and a wildcard is refused.
+  Depends on: web caller, accounts, RBAC; its tokens on sessions and devices and step-up
+  re-authentication. Touches the Portal and the load tester.
 - **About this BBS**: an about screen (name, location, sysop, version, server and node count,
   contact), drawn by the theme from facts it reads through `bbs.*`, and the same facts exported
   as JSON for BBS directories and the public API. Required: the AGPL section 13 offer of the
