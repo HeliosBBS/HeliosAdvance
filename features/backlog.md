@@ -346,6 +346,11 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   default off. ANSI music (`ESC[M` MML) passed through where supported, with a per-user
   opt-out, and stripped where not supported, since to most terminals `ESC[M` means delete
   line. Depends on: terminal negotiation, SSH caller, terminal-in-browser rendering.
+- **RIP graphics**: RIPscrip 1.54 for clients that can draw it, as SyncTERM now does. The board
+  detects RIP with the rest of terminal negotiation; themes may supply RIP screens as another
+  variant of an asset, falling back to ANSI and then plain text; RIP buttons send hotkeys, like
+  mouse click regions. Web callers get the ANSI version, or the RIP screen drawn in the
+  browser. Depends on: terminal negotiation, terminal capabilities, theme packs.
 - **Modern theme**: rich HTML on the web and a lightbar ANSI system on the terminal; shipped;
   the fallback. Its web side takes advantage of modern web design and has a modern social-media
   feel, while still reaching everything the board offers. Depends on: theme packs, Telnet
@@ -1155,6 +1160,5 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
 ## Not yet described
 
 Storage (one storage registry shared by file areas, message attachments and more), feedback to
-the sysop (counted in BBS statistics, notified by sysop notification triggers), RIP graphics
-(offered as a terminal type in user preferences), and everything else the developer adds as it
-comes up.
+the sysop (counted in BBS statistics, notified by sysop notification triggers), and everything
+else the developer adds as it comes up.
