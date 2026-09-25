@@ -155,40 +155,40 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   the binding all changeable in `hadv-config`. Depends on: servers, scripting layer, theme
   packs, languages, terminal negotiation. Touches the load tester.
 - **Accounts and login**: sign-up, login, sessions across servers, lockouts; a second factor
-  when the account's role requires it. A user's profile is private by default, and they may
-  make it public: a private user is hidden from search, profile views, who's-online, activity
-  lists and anything else where a regular user could see them or their activity, except from a
-  role holding the permission to see private users; viewing a private profile shows only
-  "This profile is private". A post or upload to a public area is the user's own affirmative
-  act and shows as usual. A user never sees someone they have blocked in who's-online, unless
-  they hold the permission to see everyone (the who's-online contract takes the viewer as an
-  input for this). Lockout is board-wide policy with one implementation that
-  every surface's sign-in uses (Telnet, SSH, web, the Admin API), counted in the database so
-  moving between servers or surfaces resets nothing. Account #1, always the main sysop
-  account, is never locked; any other account locks after 5 failed attempts for 15 minutes by
-  default, both configurable in `hadv-config`. While an account is locked, sign-in asks for the
-  password and the second factor together and answers only success or failure, never which was
-  wrong: an owner with a second factor gets in with both right, an account without one stays
-  locked, and every locked account shows the same prompt; a few attempts per lock are allowed,
-  and counted. An account holding the Sysop or Co-Sysop role
-  that is locked out a few times within a window is locked permanently until a sysop unlocks
-  it (a Sysop account only by a Sysop). Failed sign-ins also slow the source down on every
-  surface and every account: each failure from an address makes that address's next attempt
-  wait longer, and past a threshold the address is refused for a while; the server's own host
-  is slowed but never refused. A list of exempt sources, separate from the trusted proxy list,
-  covers addresses that stand for many callers (the HeliosSIP gateway, a load tester, a
-  shared address). Every tunable here has a floor and a ceiling; loosening any of them, or
-  adding an exempt source, warns loudly and needs the sysop's confirmation. The next
-  successful sign-in shows how many failures there were and from where, and when and from where
-  the last successful sign-in came. Password policy: a minimum length, optional character
-  classes, a maximum age and a reuse history, defaulting to 12 characters, no expiry and the
-  last 5 remembered; a password may be at least 64 characters long, with spaces and any
-  Unicode. After a sysop resets a password, the user must change it at the next login (default
-  yes). Concurrent logins: allow, deny, or deny on the same front end; default deny on the same
-  front end, offering to end the old session. Changing a password ends every other session.
-  The idle timeout is separate from the session time limit and set per front end, default 15
-  minutes. A setting, default yes, allows the Sysop to log in from outside sources rather than
-  only from the WFC. Depends on: scripting layer, Telnet caller.
+  when the account's role requires it. A user's profile is private by default, and they may make
+  it public: a private user is hidden from search, profile views, who's-online, activity lists
+  and anything else where a regular user could see them or their activity, except from a role
+  holding the permission to see private users; viewing a private profile shows only "This
+  profile is private". A post or upload to a public area is the user's own affirmative act and
+  shows as usual. A user never sees someone they have blocked in who's-online, unless they hold
+  the permission to see everyone (the who's-online contract takes the viewer as an input for
+  this). Lockout is board-wide policy with one implementation that every surface's sign-in uses
+  (Telnet, SSH, web, the Admin API), counted in the database so moving between servers or
+  surfaces resets nothing. Account #1, always the main sysop account, is never locked; any other
+  account locks after 5 failed attempts for 15 minutes by default, both configurable in
+  `hadv-config`. While an account is locked, sign-in asks for the password and the second factor
+  together and answers only success or failure, never which was wrong: an owner with a second
+  factor gets in with both right, an account without one stays locked, and every locked account
+  shows the same prompt; a few attempts per lock are allowed, and counted. An account holding
+  the Sysop or Co-Sysop role that is locked out a few times within a window is locked
+  permanently until a sysop unlocks it (a Sysop account only by a Sysop). Failed sign-ins also
+  slow the source down on every surface and every account: each failure from an address makes
+  that address's next attempt wait longer, and past a threshold the address is refused for a
+  while; the server's own host is slowed but never refused. A list of exempt sources, separate
+  from the trusted proxy list, covers addresses that stand for many callers (the HeliosSIP
+  gateway, a load tester, a shared address). Every tunable here has a floor and a ceiling;
+  loosening any of them, or adding an exempt source, warns loudly and needs the sysop's
+  confirmation. The next successful sign-in shows how many failures there were and from where,
+  and when and from where the last successful sign-in came. Password policy: a minimum length,
+  optional character classes, a maximum age and a reuse history, defaulting to 12 characters, no
+  expiry and the last 5 remembered; a password may be at least 64 characters long, with spaces
+  and any Unicode. After a sysop resets a password, the user must change it at the next login
+  (default yes); nobody but account #1 itself can reset account #1's password. Concurrent
+  logins: allow, deny, or deny on the same front end; default deny on the same front end,
+  offering to end the old session. Changing a password ends every other session. The idle
+  timeout is separate from the session time limit and set per front end, default 15 minutes. A
+  setting, default yes, allows the Sysop to log in from outside sources rather than only from
+  the WFC. Depends on: scripting layer, Telnet caller.
 - **Breached-password check**: a new or changed password is checked against Have I Been
   Pwned's Pwned Passwords, sending only the first five characters of its SHA-1 hash and nothing
   else, so the service never sees the password. On by default; the sysop chooses warn or
@@ -240,22 +240,36 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   untouched by promotion. Sysop and Co-Sysop are primary roles only; a grant never carries a
   permission a brief fixes to the Sysop role or to account #1; a restriction from the primary
   role or an area still applies to what a grant adds. It is rederived in the brainstorm, not
-  taken from the previous project's notes. Seeded roles, by fixed ID because names are editable:
-  1 Sysop, 2 Co-Sysop, 3 User, 4 Guest, 5 New User. Sysop: super user, unrestricted global
-  access; cannot be deleted; display name changeable, access not editable. Co-Sysop: limited
-  administration (users, file areas, message bases); cannot touch system configuration, promote
-  anyone to Sysop or Co-Sysop, take over Sysop or Co-Sysop accounts, or lock out a Sysop; cannot
-  be deleted; editable (display name, additional restrictions). User: regular registered users;
-  cannot be deleted; editable. Guest: not signed in; cannot be deleted; editable. New User:
-  baseline probationary access; can be deleted; fully editable. Account #1 is always the main
-  sysop account and owner of the system. The Sysop and Co-Sysop roles require 2FA by default;
-  each role's second factor is Required, Optional or Disabled. Every permission can be granted
-  to other roles, except those a brief fixes to the Sysop role or to account #1. A role in use
-  cannot be deleted; the refusal names what uses it. Guest, on the web, reads public areas and
-  cannot post, upload or run doors; Guest downloads only where the sysop turns that on for an
-  area, off by default; Guest over Telnet, SSH and FTP may come later. Sysop and Co-Sysop hold
-  the permission to see everyone in who's-online, private or blocked, by default. Depends on:
-  accounts and login.
+  taken from the previous project's notes. The developer's thinking on its shape, not settled:
+  RBAC owns every permission check, and each subsystem registers its own permissions, with their
+  defaults, next to its own code, so a new subsystem never touches RBAC; permissions are
+  registered once when a server starts (a duplicate name stops the start, and an unregistered
+  permission is denied), named by constants, and all listed in the sysop's permission editor; an
+  add-on module registers its permissions at install, under the module's own prefix. Default
+  holders are seed values: set at first-run setup and never imposed again. For an upgrade that
+  brings a new permission, proposed for the brainstorm: an upgrade only adds grants for
+  permissions that did not exist before and never changes a grant the sysop made; a new
+  permission that refines an existing one goes to whoever holds that one; any other new
+  permission goes to the seeded roles by their fixed IDs, and an administrative one to Sysop
+  only, never to roles the sysop made; after the upgrade the sysop is shown the new permissions
+  and who got them. The direction for the brainstorm: only account #1 itself, or the local
+  operator at the server's own host, can change account #1's password, second factor, email
+  address, SSH keys or role; removing a key or ending a session, which can only lock #1 out, is
+  not barred. Seeded roles, by fixed ID because names are editable: 1 Sysop, 2 Co-Sysop, 3 User,
+  4 Guest, 5 New User. Sysop: super user, unrestricted global access; cannot be deleted; display
+  name changeable, access not editable. Co-Sysop: limited administration (users, file areas,
+  message bases); cannot touch system configuration, promote anyone to Sysop or Co-Sysop, take
+  over Sysop or Co-Sysop accounts, or lock out a Sysop; cannot be deleted; editable (display
+  name, additional restrictions). User: regular registered users; cannot be deleted; editable.
+  Guest: not signed in; cannot be deleted; editable. New User: baseline probationary access; can
+  be deleted; fully editable. Account #1 is always the main sysop account and owner of the
+  system. The Sysop and Co-Sysop roles require 2FA by default; each role's second factor is
+  Required, Optional or Disabled. Every permission can be granted to other roles, except those a
+  brief fixes to the Sysop role or to account #1. A role in use cannot be deleted; the refusal
+  names what uses it. Guest, on the web, reads public areas and cannot post, upload or run
+  doors; Guest downloads only where the sysop turns that on for an area, off by default; Guest
+  over Telnet, SSH and FTP may come later. Sysop and Co-Sysop hold the permission to see
+  everyone in who's-online, private or blocked, by default. Depends on: accounts and login.
 - **Rate limits**: posting, private mail, uploads, search and registration are each limited
   per account and per IP address, by one mechanism on every front end, with a clear "try again
   in N seconds". The defaults are generous and roles can override them; Sysop and Co-Sysop get
@@ -309,8 +323,8 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   gets their account back. The Sysop, or a Co-Sysop within their scope, can clear a user's
   second factor; if the role requires one, the user enrols again at the next login. Clearing it
   is audited and the user is told by inbox and email; a Co-Sysop cannot clear a Sysop's or a
-  Co-Sysop's. The sysop guide says to verify who is asking first. Depends on: accounts and
-  login, second factor.
+  Co-Sysop's, and nobody but account #1 itself can clear account #1's. The sysop guide says to
+  verify who is asking first. Depends on: accounts and login, second factor.
 - **App passwords**: protocols that cannot do a second factor (FTP and FTPS, and later
   newsreader and mail-client access) refuse the main password of an account with a second
   factor and take an app password instead: named, limited to the protocols it is for, shown
