@@ -26,15 +26,15 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   form, and gendered and ordinal forms where the language requires them. Numbers, dates and
   currency are formatted per locale, separately from the user's date-format preference. Sizes
   are shown in human units (kilobytes, megabytes and so on), formatted per locale. Parody
-  languages such as pirate are supported too. Research the existing standards for this before
-  designing anything of our own. Language files do not embed colour codes; they use
-  theme-defined macros to set colours, preserving theme integrity. A string missing from a
-  language falls back to the board's default language, then to en-us, which ships complete, and
-  is logged once; a raw tag is never shown. An executable picks its language from the operating
-  system and falls back to en-us when that language is not available; en-us ships with the
-  board and others are added later. Every string passes through one parser that replaces
-  placeholders such as `{BBSNAME}` and the theme's colour macros. Depends on: servers. Touches
-  every repository in the estate.
+  languages such as pirate are supported too. The existing standards are researched in
+  HeliosDesign `records/research/languages.md`, which the brainstorm reads before designing
+  anything of our own. Language files do not embed colour codes; they use theme-defined macros
+  to set colours, preserving theme integrity. A string missing from a language falls back to
+  the board's default language, then to en-us, which ships complete, and is logged once; a raw
+  tag is never shown. An executable picks its language from the operating system and falls back
+  to en-us when that language is not available; en-us ships with the board and others are added
+  later. Every string passes through one parser that replaces placeholders such as `{BBSNAME}`
+  and the theme's colour macros. Depends on: servers. Touches every repository in the estate.
 - **Classic text-mode interface**: the TUI tools have a classic BBS feel, similar to the
   RemoteAccess configuration menu: a pull-down menu system with a modal dialog box for
   settings; our own menu items and colour scheme; a bottom help line giving the field's valid
@@ -198,7 +198,8 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   WebSocket: CP437 or UTF-8, colour tier and screen size. xterm-256 and 24-bit colour in the
   theme colour model, with automatic downgrade to 16 colours; themes declare the tier they were
   drawn for. When auto-detection fails, the board asks, assumes ANSI or assumes ASCII, as the
-  sysop sets; default ask. Depends on: nothing.
+  sysop sets; default ask. Researched in HeliosDesign
+  `records/research/terminal-negotiation.md`. Depends on: nothing.
 - **Telnet caller**: a caller connects over Telnet to a node and reaches the theme's welcome;
   option negotiation; connection limits, per-source throttling (one mechanism shared by every
   caller surface, honouring the exempt-source list), idle timeouts.
@@ -365,19 +366,20 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   deletes an account that has been inactive for longer than its role's Maximum Days of User
   Inactivity, a setting every role carries and the sysop can change on it: the Sysop role
   defaults to unlimited, Co-Sysop to 365 days, User to 180, New User to 30, and a new role to
-  180. Account #1, the main sysop account, is never deleted for inactivity. While in the virtual
-  deleted state the account is hidden, blocked from login and absent from the user list; its
-  username and email address cannot be reused by a new user; the Sysop or a Co-Sysop can restore
-  it. When the account is deleted permanently, any messages in its mailbox are deleted and
-  cannot be restored, and its username and email address may be reused, subject to the
-  former-handle period. The Sysop can delete an account permanently straight from the virtual
-  deleted state, to comply with the EU GDPR; its posts, uploads and other data then show the
-  placeholder [Deleted User]. Research whether and how the GDPR applies to the audit log and
-  other logs. An email warns the user N days before their role's inactivity limit, default 14,
-  when the board can send email and the account has an address; it is plain, with no link asking
-  for a password, just "log in to keep your account". The sysop turns the warning on or off in
-  the configuration tools, default on. Depends on: accounts and login, RBAC, event scheduler;
-  its inactivity email on the SMTP client.
+  180. Account #1, the main sysop account, is never deleted for inactivity. While in the
+  virtual deleted state the account is hidden, blocked from login and absent from the user
+  list; its username and email address cannot be reused by a new user; the Sysop or a Co-Sysop
+  can restore it. When the account is deleted permanently, any messages in its mailbox are
+  deleted and cannot be restored, and its username and email address may be reused, subject to
+  the former-handle period. The Sysop can delete an account permanently straight from the
+  virtual deleted state, to comply with the EU GDPR; its posts, uploads and other data then
+  show the placeholder [Deleted User]. How the GDPR applies to the audit log and other logs is
+  researched in HeliosDesign `records/research/legal-duties.md` (erasure against an append-only
+  audit log, and retention). An email warns the user N days before their role's inactivity
+  limit, default 14, when the board can send email and the account has an address; it is plain,
+  with no link asking for a password, just "log in to keep your account". The sysop turns the
+  warning on or off in the configuration tools, default on. Depends on: accounts and login,
+  RBAC, event scheduler; its inactivity email on the SMTP client.
 - **Second factor**: TOTP (RFC 6238), with self-service enrolment in text mode and by QR code
   on connections that support it; passkeys where the surface allows; required per role; the
   initial #1 Sysop enrols during first-run setup. Ten single-use recovery codes, stored hashed,
@@ -1028,8 +1030,9 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   cursor positioning, numbered menus, the line editor, no art (its SAUCE title and description
   instead, where there is one), and nothing conveyed by colour alone. Time limits and idle
   timeouts can be extended or warned about; blinking, animation and baud-rate emulation can be
-  turned off. The shipped themes meet it; theme packs declare whether they do. Research the
-  existing standards before designing anything of our own. Depends on: user preferences,
+  turned off. The shipped themes meet it; theme packs declare whether they do. The existing
+  standards are researched in HeliosDesign `records/research/accessibility-terminals.md`, which
+  the brainstorm reads before designing anything of our own. Depends on: user preferences,
   theme packs, terminal negotiation, classic text-mode interface.
 - **Birthdays**: a birthday list, and a greeting at login on the user's own birthday. The list
   shows month and day only, never the year or an age; appearing in it is the user's choice,
@@ -1222,15 +1225,16 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   stolen disk or backup, not against the holder of the keys. A private message its recipient
   reports reaches the moderation queue by their choice and needs no break-glass. A sysop
   cannot widen the policy. Depends on: private messages, registration gates.
-- **Legal duties**, research first: the board helps a sysop meet the law that applies to a
-  service hosting other people's content, without claiming to make them compliant. To research
-  before designing anything: a privacy notice (what is collected, how long it is kept, the
-  user's rights), with retention periods for connection logs, IP addresses and the audit log;
-  reports of illegal content accepted from anyone, not only members, and a statement of reasons
-  to a user whose content is removed (the EU Digital Services Act); a copyright takedown and
-  counter-notice process (the US DMCA safe harbour); illegal content that must be preserved and
-  reported rather than only deleted; a legal contact on the about page. Depends on: content
-  moderation, registration gates, about this BBS.
+- **Legal duties**: the board helps a sysop meet the law that applies to a service hosting
+  other people's content, without claiming to make them compliant. Researched in HeliosDesign
+  `records/research/legal-duties.md`, which the brainstorm reads before designing anything: a
+  privacy notice (what is collected, how long it is kept, the user's rights), with retention
+  periods for connection logs, IP addresses and the audit log; reports of illegal content
+  accepted from anyone, not only members, and a statement of reasons to a user whose content is
+  removed (the EU Digital Services Act); a copyright takedown and counter-notice process (the
+  US DMCA safe harbour); illegal content that must be preserved and reported rather than only
+  deleted; a legal contact on the about page. Depends on: content moderation, registration
+  gates, about this BBS.
 - **Advisory signals**: at registration the address is checked against the Tor exit list and
   abuse feeds, downloaded as lists and checked on the board, never looked up one user at a
   time with a third party; a match is a flag for the sysop, never a block. An account sharing
@@ -1322,10 +1326,11 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   the content moderation system, honouring blocks and private profiles as who's online does.
   A user can page another user and send them a chat request; do not disturb blocks both.
   Depends on: who's online, content moderation, user preferences.
-- **Inter-BBS chat**, for later: multi-user chat joins rooms shared with other boards. Research
-  MRC (Multi Relay Chat) compatibility first, rather than inventing a network: its protocol and
-  hub model, TLS, and whether it is specified openly enough to implement from our own notes; the
-  research may say no. Off by default. Remote chat passes through the same moderation as local
+- **Inter-BBS chat**, for later: multi-user chat joins rooms shared with other boards. MRC
+  (Multi Relay Chat) compatibility was researched first, rather than inventing a network, in
+  HeliosDesign `records/research/mrc-inter-bbs-chat.md`: its protocol is not openly published,
+  so MRC cannot be built from open documents today, and the brainstorm weighs the alternatives
+  the record lists. Off by default. Remote chat passes through the same moderation as local
   chat, and users can block remote chatters. Depends on: multi-user chat, blocking and muting.
 - **Sysop break-in chat**: the Sysop can break in on a caller with a two-way split-screen chat
   from the WFC consoles (`hadv-console`, `hadv-console-gui`). Sysop only by default; the Sysop
