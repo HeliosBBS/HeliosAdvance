@@ -195,6 +195,9 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   and set per front end, default 15 minutes. A setting, default yes, allows the Sysop to log in
   from outside sources rather than only from the WFC. Depends on: scripting layer, Telnet
   caller, exempt sources.
+- **Inbox**: the board's notices to a user, with read state on the terminal and the web and an
+  unread count at login and in the prompt; system and security notices arrive here, and other
+  entries deliver their notices to it. Depends on: accounts and login.
 - **Breached-password check**: a new or changed password is checked against Have I Been
   Pwned's Pwned Passwords, sending only the first five characters of its SHA-1 hash and nothing
   else, so the service never sees the password. On by default; the sysop chooses warn or
@@ -302,7 +305,8 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   messages), while the sysop's console keeps the full detail, and do not disturb shows here. The
   status line is user content: length-limited, checked against watched words and reportable.
   Depends on: role-based access control, watched words; its status-line reporting on content
-  moderation.
+  moderation; its block rule on blocking and muting; its do-not-disturb display on user
+  preferences.
 - **Account deletion**: a user can delete their own account after a confirmation (typing
   something, or their second factor); account #1, the main sysop account, cannot delete itself.
   Deleting an account, whether the user, the Sysop or maintenance does it, puts it in a virtual
@@ -327,8 +331,16 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
 - **Second factor**: TOTP (RFC 6238), with self-service enrolment in text mode and by QR code
   on connections that support it; passkeys where the surface allows; required per role; the
   initial #1 Sysop enrols during first-run setup. Ten single-use recovery codes, stored hashed,
-  are shown once at enrolment and can be regenerated. Depends on: accounts, RBAC. Touches the
-  Portal.
+  are shown once at enrolment and can be regenerated. Depends on: accounts, RBAC; its QR
+  enrolment on terminal capabilities; its passkeys on web caller. Touches the Portal.
+- **Step-up re-authentication**: one mechanism, used by user self-service, by administrators'
+  destructive commands and by the console turning a service on, which ADV-002 already
+  requires. A user gives their password or second factor again before changing their email
+  address or password, disabling TOTP, deleting their account, adding an SSH key or
+  regenerating recovery codes; a short window after a step-up covers several changes. The
+  Sysop's and Co-Sysops' destructive commands inside a session need a step-up on a cadence the
+  sysop sets (per login, per command or per time interval), default every 15 minutes. Depends
+  on: accounts and login, second factor.
 - **Account recovery**: a user who has forgotten their password, or lost their second factor,
   gets their account back. The Sysop, or a Co-Sysop within their scope, can clear a user's
   second factor; if the role requires one, the user enrols again at the next login. Clearing it
@@ -343,7 +355,8 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   and revokes every token, and changes nothing else; it acts on account #1 alone; it writes an
   audit entry and tells #1's email address and every other Sysop-role account. This widens
   ADV-001's rule that the local operator changes only what restores connectivity, so the
-  brainstorm amends ADV-001. Depends on: accounts and login, second factor.
+  brainstorm amends ADV-001. Depends on: accounts and login, second factor, inbox; its email
+  notice on SMTP client.
 - **App passwords**: protocols that cannot do a second factor (FTP and FTPS, and later
   newsreader and mail-client access) refuse the main password of an account with a second
   factor and take an app password instead: named, limited to the protocols it is for, shown
@@ -472,6 +485,10 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   page listing every dependency and its licence, generated at build time and served next to
   the source offer. Uptime and last restart are for the sysop, in the WFC, not for users.
   Depends on: scripting layer, public API.
+- **User editor**: `hadv-useredit` and `hadv-useredit-gui`, spawned from the console or run
+  alone. `hadv-useredit` also has a CLI (suspend, unlock, reset, change role) for scripting and
+  recovery, signing in and taking secrets as the `hadv-config` CLI does. Depends on: RBAC,
+  remote administration.
 - **Waiting-for-Caller console**: `hadv-console` (TUI only; no CLI unless a use case appears)
   and `hadv-console-gui`, run on the server or remotely; long-lived tokens; the GUI minimises
   to the taskbar and can start minimised so it starts after login. It shows who is on which
@@ -483,7 +500,8 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   shows source IP, front end and result. The main screen has indicators for the moderation
   queue, pending users and unread feedback. Quick actions on a node: chat, spy, force logoff,
   lock the node, send a message. Depends on: remote administration, classic text-mode
-  interface.
+  interface, user editor; its queue, pending-user, feedback and chat actions on content
+  moderation, registration gates, private messages and sysop break-in chat.
 - **Sysop messages and draining**: node-to-node messages and messages from the sysop to a user
   arrive in the live session; a broadcast reaches every online user on every server, with an
   optional shutdown countdown; a forced logoff of a user or a node shows the user the reason.
@@ -495,7 +513,7 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   at login and in the web banner during a window the sysop sets. Do not disturb never blocks a
   broadcast or a message from the sysop. Draining is not turning a service off, which closes
   its listener; the console shows which applies. The theme draws live messages. Depends on:
-  Waiting-for-Caller console.
+  Waiting-for-Caller console; its do-not-disturb rule on user preferences.
 - **Taskview**: in the WFC, see running tasks, with progress if the task supports it, and
   cancel a task if the task supports it, much as Nutanix Prism Central does. It is open to
   every part of the BBS, not only the event scheduler: a background virus scan, mail tossing
@@ -507,12 +525,9 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   console, turning a service off needs no extra sign-in and turning it on needs step-up (the
   Sysop's password and second factor); both are audited. Turning the web off never affects the
   Admin API. The sysop guide says to point DNS or a load balancer for a service only at the
-  servers that run it. Depends on: configuration, Waiting-for-Caller console; blocked on an
-  amendment to ADV-002, whose console tokens change no settings.
-- **User editor**: `hadv-useredit` and `hadv-useredit-gui`, spawned from the console or run
-  alone. `hadv-useredit` also has a CLI (suspend, unlock, reset, change role) for scripting and
-  recovery, signing in and taking secrets as the `hadv-config` CLI does. Depends on: RBAC,
-  remote administration.
+  servers that run it. Depends on: configuration, Waiting-for-Caller console, step-up
+  re-authentication; blocked on ADV-002's design change for console tokens (its brief now lets
+  the console turn a service off, and on with a step-up).
 - **Allow-list self-lockout guard**: a change to the Admin API's allow list that would shut out
   the connection making it is refused outright, with no override; the refusal says to make the
   change from another admitted address or from the server's own host. Depends on: remote
@@ -558,21 +573,21 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   choose, optionally copied off the server, and can be restored onto the same install or a fresh
   one by a documented procedure that is itself tested; secrets travel only encrypted; a failed
   backup alerts the sysop. Depends on: event scheduler, database upgrades, storage.
-- **Auto-update**: a server updates itself from the published releases, verifying the
-  release's signature and build-provenance attestation against the project's publishing
-  identity before anything is applied (supply-chain protection built on the git and release
-  infrastructure), rolling across a multi-server board one server at a time within the
-  one-version skew rule. The sysop picks off, notify only, download and notify, or download
-  and install; default notify only, and choosing off warns. RPM, DEB and Docker installs only
-  ever notify, since the package manager or Docker does the update; Inno Setup and WinGet
-  installs use the built-in updater. A release can be flagged critical, for a louder notice.
-  Stable and beta channels, beta opt-in and signed like every release. Across mixed update
-  methods, servers that update themselves go one at a time (drain, update, readiness check,
-  next), while package-managed servers are reported rather than driven: the console offers to
-  drain them and tracks each until it returns on the new version. One console view shows every
-  server's version. Migrations run once, on the first server to reach the new version. The
-  sysop guide warns against skipping a minor version. Depends on: installation, servers, nodes
-  and one board, database upgrades, sysop messages and draining.
+- **Auto-update**: a server updates itself from the published releases, verifying the release's
+  signature and build-provenance attestation against the project's publishing identity before
+  anything is applied (supply-chain protection built on the git and release infrastructure),
+  rolling across a multi-server board one server at a time within the one-version skew rule.
+  The sysop picks off, notify only, download and notify, or download and install; default
+  notify only, and choosing off warns. RPM, DEB and Docker installs only ever notify, since the
+  package manager or Docker does the update; Inno Setup and WinGet installs use the built-in
+  updater. A release can be flagged critical, for a louder notice. Stable and beta channels,
+  beta opt-in and signed like every release. Across mixed update methods, servers that update
+  themselves go one at a time (drain, update, readiness check, next), while package-managed
+  servers are reported rather than driven: the console offers to drain them and tracks each
+  until it returns on the new version. One console view shows every server's version. A release
+  carrying data-model changes waits for the sysop to run `hadv-setup`'s upgrade, the only way
+  the data model changes. The sysop guide warns against skipping a minor version. Depends on:
+  installation, servers, nodes and one board, database upgrades, sysop messages and draining.
 - **Configuration export and import**: the board's configuration (settings, areas, roles,
   networks; never secrets) exports as one file that diffs cleanly. An import lands as pending
   changes in the configuration tools, so the dry run is the pending list and applying it is the
@@ -668,7 +683,8 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   Co-Sysop, User, New User, Guest; required reading, yes) and General Discussion (read by Sysop,
   Co-Sysop, User, New User, Guest; post by Sysop, Co-Sysop, User, New User; moderate by Sysop,
   Co-Sysop). Depends on: conferences, account deletion, event scheduler, watched words; its
-  approval settings on content moderation.
+  approval settings on content moderation; its attachment storage on storage; its Sub and Drop
+  requests on mail networks.
 - **Reactions**: users react to posts, files and other content. Likes show as counts, while
   dislikes are a private signal for ranking and moderation, never shown as a count. On the
   terminal, reactions show as counts in the message header, with a hotkey to react. The
@@ -713,8 +729,8 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   default. Depends on: conferences, account deletion, storage, reactions; its upload approval
   on content moderation.
 - **Private messages**: user-to-user mail on the board. Folders Inbox, Sent and Trash by
-  default, with Saved and folders of the user's own optional. CC and BCC. Mail to a role or
-  group is a permission, held by Sysop and Co-Sysop by default; mail to the Sysop role
+  default, with Saved and folders of the user's own optional. CC and BCC. Mail to a role is a
+  permission, held by Sysop and Co-Sysop by default; mail to the Sysop role
   (feedback) stays open to everyone. A return receipt, off by default, which a recipient can
   choose never to send. Forward with attribution, and reply-all. Read mail can expire, off by
   default; a message can be marked unread or kept permanently. A vacation auto-reply, off by
@@ -746,7 +762,8 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   is hidden or collapsed while the person still exists, synced across front ends. Nobody can
   block moderation: notices from the Sysop and moderators, bans and appeal replies always
   arrive, and moderators acting as moderators still see a blocked user's content. Depends on:
-  accounts and login, private messages, message bases.
+  accounts and login, private messages, message bases; its network-address blocks on mail
+  networks.
 - **Search**: a global search across every searchable area, or a search of one area, chosen from
   where the user is; posts and files; a username search; filters `from:`, `area:`, `before:`,
   `after:` and `has:attachment`. Result counts, "no results" and suggestions are worked out only
@@ -755,7 +772,7 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   muted content stays hidden. A saved search can notify its owner of new matches, which covers
   keyword watches: only for posts the user can read, never from a muted area or a blocked user,
   and with a cap on such searches per user. Depends on: message bases, file bases, RBAC,
-  blocking and muting, rate limits; notifying saved searches on notifications.
+  blocking and muting, rate limits; its notifying saved searches on notifications.
 - **File transfer on classic connections**: upload and download protocols over Telnet and SSH
   sessions. A protocol registry: XModem, XModem-1K, YModem, YModem-G and ZModem, with HTTP(S)
   and FTP as entries of their own; each protocol is on or off and available per role, default
@@ -773,7 +790,8 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   user-verified flag (a PIN or biometric, not just a touch) satisfies the second factor on its
   own, checked at every login; a touch-only signature still gets the TOTP prompt. The sysop can
   remove a user's key: audited, the user told by inbox and email, and a Co-Sysop cannot remove
-  a Sysop's or a Co-Sysop's. Depends on: SSH caller, accounts, second factor, file transfer.
+  a Sysop's or a Co-Sysop's. Depends on: SSH caller, accounts, second factor, file transfer,
+  inbox; its email notice on SMTP client.
 - **Full-screen text editor**: a full-screen text editor for legacy protocols, with ANSI
   cursor positioning, automatic word wrap, insert and overwrite modes, block and line
   operations, inline colour code support, extended ASCII support, message quoting and CTRL
@@ -810,31 +828,24 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   (the front end, the IP address, the last activity) and ends one or all of them. A login from
   a new network (an IPv4 /24 or IPv6 /48 not seen before) or a new front end alerts the user,
   on by default: in the inbox always, and by email once the board can send it. App passwords
-  are listed here too. Depends on: accounts and login, IPv4 and IPv6, SMTP client.
-- **Step-up re-authentication**: one mechanism, used by user self-service, by administrators'
-  destructive commands and by the console turning a service on. A user gives their password
-  or second factor again before changing their email address or password, disabling TOTP,
-  deleting their account, adding an SSH key or regenerating recovery codes; a short window
-  after a step-up covers several changes. An email address change is confirmed to both
+  are listed here too. Depends on: accounts and login, IPv4 and IPv6, inbox, SMTP client.
+- **Email address change confirmation**: an email address change is confirmed to both
   addresses, and the old one gets a "this wasn't me" link that reverses the change within a
-  set period. The Sysop's and Co-Sysops' destructive commands inside a session need a step-up
-  on a cadence the sysop sets (per login, per command or per time interval), default every 15
-  minutes. Depends on: accounts and login, second factor, SMTP client.
+  set period. Depends on: step-up re-authentication, SMTP client.
 - **Data export**: a user exports their messages, mail, uploads list and profile as zip or
   JSON, one export every 7 days by default, after a step-up, delivered through the board and
   never emailed; staff notes are left out. The Sysop exports everything the board holds about
   one user, the Sysop note included, to answer a GDPR subject-access request. Depends on:
   accounts and login, private messages, message bases, file bases, step-up re-authentication.
-- **Notifications**: an inbox with read state on the terminal and the web: mentions, replies,
-  moderation actions on your content and system notices, with an unread count at login and in
-  the prompt. Each area has a level, watching, tracking, normal or muted, default normal;
+- **Notifications**: mentions, replies and moderation actions on your content, delivered to the
+  inbox. Each area has a level, watching, tracking, normal or muted, default normal;
   following an area sets watching, and muted is the same as muting the area, not a second
   switch. A digest email, daily or weekly, opt-in, with a one-click unsubscribe (RFC 8058).
   Notices coalesce ("3 new replies in X"). Quiet hours, in the user's time zone. Web push, off
   unless the user turns it on, with a minimal payload. Security notices (login alerts, email
   changes, second-factor resets) always go straight through: never coalesced, put in a digest,
-  held by quiet hours or muted. Depends on: accounts and login, SMTP client, blocking and
-  muting.
+  held by quiet hours or muted. Depends on: accounts and login, inbox, SMTP client, blocking
+  and muting.
 - **Mentions and reply links**: an `@mention`, written with the handle's mailbox name
   (`@Dark.Lord`, so a handle with spaces is unambiguous), notifies the user, but only if they
   can read the post; a mention of a user the poster cannot see stays plain text; blocks apply.
@@ -896,18 +907,18 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   mail and external email share one store. Depends on: private messages, certificates, user
   profile and new-user questions.
 - **POP3 client (receiving email)**: the board retrieves inbound mail from a catch-all mailbox
-  on an external POP3 server, over POP3 or POP3S (SSL/TLS), and automatically parses and
-  routes it to the right internal user. It generates a bounce when the recipient does not
-  exist or delivery fails; the sysop can suppress bounces to bound backscatter. Background
+  on an external POP3 server, over POP3 or POP3S (SSL/TLS), and automatically parses and routes
+  it to the right internal user. Off by default. It generates a bounce when the recipient does
+  not exist or delivery fails; the sysop can suppress bounces to bound backscatter. Background
   polling interval configurable; deleting mail from the server after processing is a
   configurable option. Depends on: SMTP server, SMTP client.
 - **IMAP client (receiving email)**: the board retrieves inbound mail from a catch-all mailbox
   on an external IMAP server, over IMAP or IMAPS (SSL/TLS), and parses and routes it to
-  internal users. It generates a bounce for a non-existent or failed recipient; the sysop can
-  suppress bounces to bound backscatter. It keeps the IMAP session connected to use push (the
-  IDLE command), and falls back to background polling, interval configurable, for a server
-  without push. Deleting processed mail from the server is a configurable option. Depends on:
-  SMTP server, SMTP client.
+  internal users. Off by default. It generates a bounce for a non-existent or failed recipient;
+  the sysop can suppress bounces to bound backscatter. It keeps the IMAP session connected to
+  use push (the IDLE command), and falls back to background polling, interval configurable, for
+  a server without push. Deleting processed mail from the server is a configurable option.
+  Depends on: SMTP server, SMTP client.
 - **User statistics**: per account: first on, last on, logons today and in total, posts today
   and in total, netmail and email sent and received today and in total, netmail and email sent
   to sysops in total, uploads and upload bytes in total, downloads and download bytes in total.
@@ -1252,19 +1263,20 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   of its output), in the inbox and optionally by email. Operational alerts too: a certificate
   about to expire, disk space running low, a server whose lease was lost, a network link with no
   successful session for a number of days the sysop sets, a failed backup, and a critical
-  update. Depends on: bans, suspensions and appeals, SMTP client, event scheduler, certificates,
-  mail networks, backup and restore, auto-update.
+  update. Depends on: inbox, bans, suspensions and appeals, SMTP client, event scheduler,
+  certificates, mail networks, backup and restore, auto-update.
 
 ## Chat
 
 - **Multi-user chat**: users chat with other online users in an IRC-style chat, supported by
   the content moderation system, honouring blocks and private profiles as who's online does.
-  Depends on: who's online, content moderation.
+  A user can page another user and send them a chat request; do not disturb blocks both.
+  Depends on: who's online, content moderation, user preferences.
 - **Inter-BBS chat**, for later: multi-user chat joins rooms shared with other boards. Research
   MRC (Multi Relay Chat) compatibility first, rather than inventing a network: its protocol and
   hub model, TLS, and whether it is specified openly enough to implement from our own notes; the
-  research may say no. Remote chat passes through the same moderation as local chat, and users
-  can block remote chatters. Depends on: multi-user chat, blocking and muting.
+  research may say no. Off by default. Remote chat passes through the same moderation as local
+  chat, and users can block remote chatters. Depends on: multi-user chat, blocking and muting.
 - **Sysop break-in chat**: the Sysop can break in on a caller with a two-way split-screen chat
   from the WFC consoles (`hadv-console`, `hadv-console-gui`). Sysop only by default; the Sysop
   can grant the permission to other roles. A caller without ANSI gets line-by-line chat.
@@ -1277,6 +1289,5 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
 
 ## Not yet described
 
-Storage (one storage registry shared by file areas, message attachments and more), feedback to
-the sysop (counted in BBS statistics, notified by sysop notification triggers), and everything
-else the developer adds as it comes up.
+Storage (one storage registry shared by file areas, message attachments and more), and
+everything else the developer adds as it comes up.
