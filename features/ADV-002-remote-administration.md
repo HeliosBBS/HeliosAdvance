@@ -99,8 +99,11 @@ Console tokens:
 - If a request carries a console token without a valid signature from the device key it is
   bound to, then the system shall refuse it.
 - While a console token is valid, the system shall allow it console actions only (watching,
-  kicking a caller, restarting a node and the other console actions), and shall refuse it any
-  change to settings, tokens, accounts, roles or second-factor requirements.
+  kicking a caller, restarting a node and the other console actions) and turning a service
+  off, on one server or on every server, and shall refuse it any other change to settings,
+  tokens, accounts, roles or second-factor requirements.
+- When the console asks to turn a service on, the system shall require the password and second
+  factor of a Sysop-role account again before it changes the setting.
 - When the console launches the user editor, the user editor shall ask for its own sign-in,
   and its session shall end on the same timeouts as `hadv-config`'s.
 - When a console token's lifetime has passed since sign-in, or it has gone unused for 24
@@ -242,12 +245,13 @@ Both:
 9. **A stolen console token.** Attacker: whoever takes the token from, or compromises, the
    sysop's PC. Abuse: running the console as the sysop. Decision: the token is tied to a key
    held on the device, in the hardware key store where one is reachable; it is limited to
-   console actions; it lasts 1 day by default, 7 days at most, counted from sign-in; it ends
-   after 24 hours unused; it is listed and can be revoked; a new device is flagged to every
-   Sysop; the user editor asks for its own sign-in. Why: the console acts freely, while a
-   stolen token is worth little. Accepted risk: malware running live on the PC can drive an
-   open console; the token's narrow scope limits what that achieves. Fails closed: a request
-   without a valid device signature is refused.
+   console actions and to turning a service off, which only closes access, while turning one on
+   needs a Sysop's password and second factor again; it lasts 1 day by default, 7 days at most,
+   counted from sign-in; it ends after 24 hours unused; it is listed and can be revoked; a new
+   device is flagged to every Sysop; the user editor asks for its own sign-in. Why: the console
+   acts freely, while a stolen token is worth little. Accepted risk: malware running live on the
+   PC can drive an open console; the token's narrow scope limits what that achieves. Fails
+   closed: a request without a valid device signature is refused.
 10. **A leaked automation token.** Attacker: whoever reads a script, a CI secret or a log.
     Abuse: changing the board. Decision: the token is scoped by settings group for reading
     and changing separately; some actions no token can ever do (managing tokens, accounts or
