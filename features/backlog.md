@@ -537,7 +537,13 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   conferences are created only by initial setup (`hadv-setup`) and are not changed
   automatically afterwards; sysops may freely edit or delete them. A conference cannot be
   deleted until it has no areas below it; existing areas must be moved or deleted first.
-  Depends on: RBAC, user profile and new-user questions, first-run setup.
+  Since access is already the conference and the area together, configuration keeps settings
+  honest: it refuses an area setting wider than its conference and says why (the conference
+  requires 18, so the area cannot go lower); a scan finds settings that can never take effect,
+  such as a role let into an area but not its conference, and offers to fix them, never
+  silently widening the conference; moving an area shows the settings now wider than its new
+  conference and offers the same fixes. Depends on: RBAC, user profile and new-user
+  questions, first-run setup.
 - **Message bases**: public message areas under conferences. If the network type supports it,
   adding a Sub or Echo asks whether to send a Sub request automatically; deleting one asks
   whether to send a Drop request; and if the network supports it and the sysop chooses to
@@ -590,10 +596,37 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   uploads" view per user. A per-area file naming policy: long names or 8.3, case handling,
   illegal-character rewriting. Ad-file injection: sysop-configured advertisement text stamped
   as an extra file into outgoing archives, with its own enable, text and filename settings;
-  default off, and never into an archive that carries a signature. Depends on: conferences,
-  account deletion, storage.
-- **Private messages**: user-to-user mail on the board. Depends on: accounts, RBAC, account
-  deletion.
+  default off, and never into an archive that carries a signature. FILE_ID.DIZ and
+  DESCRIPT.ION are read into the description, as untrusted text: only the board's allowed
+  attribute codes are kept, every other escape sequence is stripped, the text is size-bounded,
+  and the archive is opened under the same limits as virus scanning. A ban list of filename
+  patterns. Per area, a maximum number of files and a purge by age, both off by default,
+  because a purge deletes uploads the sysop curated. Per role, a daily download byte limit and
+  a largest downloadable file. A file area can be a text library (G-files): its files cost no
+  ratio, open inline with the same stripping, and show the SAUCE title and author in the
+  listing. Seeded areas: Sysop, always ID 1, editable but never deleted, viewed and downloaded
+  by Sysop and Co-Sysop, open to uploads from every user without approval, receiving uploads
+  meant for the sysop and every upload when "all uploads to Sysop" is on (default off); and
+  Games and Miscellaneous, whose uploads need approval and where Guest downloads are off by
+  default. Depends on: conferences, account deletion, storage.
+- **Private messages**: user-to-user mail on the board. Folders Inbox, Sent and Trash by
+  default, with Saved and folders of the user's own optional. CC and BCC. Mail to a role or
+  group is a permission, held by Sysop and Co-Sysop by default; mail to the Sysop role
+  (feedback) stays open to everyone. A return receipt, off by default, which a recipient can
+  choose never to send. Forward with attribution, and reply-all. Read mail can expire, off by
+  default; a message can be marked unread or kept permanently. A vacation auto-reply, off by
+  default, limited per sender and following RFC 3834, so it never answers a list, bulk mail or
+  another auto-reply. One quota for the store private mail shares with email, per user and per
+  role, on by default and generous, with a warning; a full mailbox refuses new mail with a
+  clear reason and deletes nothing. Depends on: accounts, RBAC, account deletion.
+- **Drafts and read state**: a draft is kept on the server, saved on a timer and when the
+  connection drops, and resumed from any front end; on by default; one per user per area and
+  one per private-mail conversation; drafts are personal data, exported and deleted with the
+  account. Read state is per user and kept on the server, shared by Telnet, SSH and the web,
+  so no front end keeps its own pointer. Each message has a "new since last visit" marker as
+  well as the area pointer, for threaded and out-of-order reading; kept naively that is a row
+  per user per message, so how it is stored is decided with that cost in mind. Depends on:
+  message bases, private messages.
 - **Welcome mail**: each new user gets a welcome message from the sysop, from a template per
   language, on by default; the shipped template is short and friendly. Depends on: private
   messages, languages.
@@ -614,7 +647,16 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   blocked never appear, and muted content stays hidden. Depends on: message bases, file bases,
   RBAC, blocking and muting, rate limits.
 - **File transfer on classic connections**: upload and download protocols over Telnet and SSH
-  sessions. Depends on: Telnet and SSH callers, file bases.
+  sessions. A protocol registry: XModem, XModem-1K, YModem, YModem-G and ZModem, with HTTP(S)
+  and FTP as entries of their own; each protocol is on or off and available per role, default
+  ZModem and the web; a batch flag decides whether the tagged queue is offered; a transfer log
+  (protocol, bytes, speed, result) feeds the download counters and user statistics. The
+  protocols run as external programs, lrzsz or SEXYZ, not yet chosen; one that ships in the
+  installers appears on the licence page and its source is offered. The sysop adds external
+  protocols with command-line templates, a hotkey and an order. A template is expanded into an
+  argument list and run directly, never through a shell; a filename is checked against the
+  area's naming policy first; protocols are defined only in `hadv-config`, by the Sysop, and
+  audited. Depends on: Telnet and SSH callers, file bases.
 - **SSH public-key login**: a user uploads a public key (on the web, or by file transfer on a
   classic connection) and logs in with it; a required second factor still applies. FIDO2
   security keys (`ed25519-sk`, `ecdsa-sk`) are accepted, and a signature carrying the
@@ -664,20 +706,59 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   never emailed; staff notes are left out. The Sysop exports everything the board holds about
   one user, the Sysop note included, to answer a GDPR subject-access request. Depends on:
   accounts and login, private messages, message bases, file bases, step-up re-authentication.
+- **Notifications**: an inbox with read state on the terminal and the web: mentions, replies,
+  moderation actions on your content and system notices, with an unread count at login and in
+  the prompt. Each area has a level, watching, tracking, normal or muted, default normal;
+  following an area sets watching, and muted is the same as muting the area, not a second
+  switch. A digest email, daily or weekly, opt-in, with a one-click unsubscribe (RFC 8058).
+  Notices coalesce ("3 new replies in X"). Quiet hours, in the user's time zone. Web push, off
+  unless the user turns it on, with a minimal payload. Security notices (login alerts, email
+  changes, second-factor resets) always go straight through: never coalesced, put in a digest,
+  held by quiet hours or muted. Depends on: accounts and login, SMTP client, blocking and
+  muting.
+- **Mentions and reply links**: an `@mention`, written with the handle's mailbox name
+  (`@Dark.Lord`, so a handle with spaces is unambiguous), notifies the user, but only if they
+  can read the post; a mention of a user the poster cannot see stays plain text; blocks apply.
+  Mentions become links and notifications here, when shown; a message exported to a network
+  goes exactly as written, its `@` never stripped, and a mention of a user on another board
+  stays text. A message shows "N replies", and a reply links to what it quoted; in network
+  areas the links come from the network's own reply references. Depends on: message bases,
+  notifications, blocking and muting.
+- **Bookmarks**: anyone who can read a message can bookmark it, with an optional reminder date
+  delivered as a notification, the same on every front end. Access is checked when a bookmark
+  is opened, so a message the user can no longer read shows "no longer available". Bookmarks
+  are personal data, exported and deleted with the account. Depends on: message bases,
+  notifications.
+- **Social media features**: ready for an early brainstorm. Following an area is new-scan
+  participation (force on, default on or default off per area), so a new user's feed is not
+  empty; users follow other users; each profile has a microblog, extending one-liners; likes
+  show as counts, while dislikes are a private signal for ranking and moderation, never shown
+  as a count. Old-school and new-school parity: one store, two renderers, the web feed being
+  new-scan with another sort; chronological by default, ranking a toggle that never filters
+  below what new-scan would show; reactions as counts in the terminal header, with a hotkey;
+  direct messages are private mail; a boost is a cross-post to an area you moderate, a quote
+  post is quoting; hashtags are tags beside the area tree, listed in the terminal as virtual
+  areas, as are saved searches; sharing is the permalink shown by the message number; presence
+  is who's online with a status; avatars have an ANSI variant, treated as untrusted like DIZ
+  text; follow requests for locked accounts from day one, and the brainstorm defines locked
+  against private. Not carried over: infinite scroll, video, live streams, stories. Ranking is
+  a Lua script the sysop can swap; the reaction set is configurable per theme. A banned or
+  suspended user's social content is hidden while the restriction lasts and restored when it
+  is lifted. Depends on: message bases, private messages, who's online, search, notifications.
 - **SMTP server (receiving email)**: the board receives email for its users. Strict anti-relay
   rules: accept only email for local users and local domains. Port binding and listening
   addresses configurable. Maximum simultaneous connections configurable, default 100, shared
-  across the SMTP, POP3 and IMAP servers. The SMTP server and each transport mode can be
-  enabled and disabled individually in configuration, and all are off by default. The normal
-  internet ports by default: TCP/25 receives from other mail servers, with STARTTLS offered and
-  plain text accepted from a server that does not use it, for legacy network compatibility;
-  TCP/587 (STARTTLS) and TCP/465 (implicit TLS, SMTPS) are the submission ports for users'
-  email clients, a later feature. Per-user address format: `handle@domain`, `first.last@domain`
-  or a user-chosen alias, default `handle@domain`. Per-user address aliases; a catch-all or
-  postmaster destination. Mailbox quota per user and per role, with a warning threshold,
-  default off. Maximum accepted message size and maximum attachment size, default 25 MB. The
-  board's private mail and external email share one store. Depends on: private messages,
-  certificates, user profile and new-user questions.
+  across the SMTP, POP3 and IMAP servers. The SMTP server and each transport mode can be enabled
+  and disabled individually in configuration, and all are off by default. The normal internet
+  ports by default: TCP/25 receives from other mail servers, with STARTTLS offered and plain
+  text accepted from a server that does not use it, for legacy network compatibility; TCP/587
+  (STARTTLS) and TCP/465 (implicit TLS, SMTPS) are the submission ports for users' email
+  clients, a later feature. Per-user address format: `handle@domain`, `first.last@domain` or a
+  user-chosen alias, default `handle@domain`. Per-user address aliases; a catch-all or
+  postmaster destination. The mailbox quota is the one private messages defines. Maximum
+  accepted message size and maximum attachment size, default 25 MB. The board's private mail and
+  external email share one store. Depends on: private messages, certificates, user profile and
+  new-user questions.
 - **POP3 client (receiving email)**: the board retrieves inbound mail from a catch-all mailbox
   on an external POP3 server, over POP3 or POP3S (SSL/TLS), and automatically parses and
   routes it to the right internal user. It generates a bounce when the recipient does not
@@ -694,7 +775,10 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
 - **User statistics**: per account: first on, last on, logons today and in total, posts today
   and in total, netmail and email sent and received today and in total, netmail and email sent
   to sysops in total, uploads and upload bytes in total, downloads and download bytes in total.
-  A day for the "today" counters is a day in the board's time zone. Depends on: accounts and
+  A day for the "today" counters is a day in the board's time zone. Also messages read, time
+  online, and likes given and received once social media features exist. A "your stats" page,
+  drawn by the theme, shows messages read, posts, time online, likes, files up and down, and
+  member since; another user's stats honour a private profile. Depends on: accounts and
   login, message bases, private messages, file bases, time zones and daylight saving.
 - **BBS statistics**: board-wide counters: logons, online time, netmail and email sent,
   feedback sent, new users, posts, uploads and upload bytes, downloads and download bytes
@@ -741,6 +825,17 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   daylight saving, theme packs, message bases, private messages, file transfer on classic
   connections, SMTP client, full-screen text editor, basic line text editor, terminal
   capabilities.
+- **Birthdays**: a birthday list, and a greeting at login on the user's own birthday. The list
+  shows month and day only, never the year or an age; appearing in it is the user's choice,
+  off by default even with a public profile, and a private profile never appears. The engine
+  answers whose birthday it is among those who opted in, through `bbs.*`, and the themes draw
+  it. Depends on: user profile and new-user questions, user preferences.
+- **Signatures and taglines**: an automatic signature and rotating taglines per user. A
+  signature has a line limit, classically 4, which the sysop sets. Both are user content,
+  checked against watched words, with untrusted escape sequences stripped; their colour codes
+  are converted or stripped per network on export, as the attribute codes entry does for
+  bodies, and taglines follow the network's convention. Per area, a setting strips signatures
+  on network export. Depends on: message bases, user preferences, attribute codes.
 - **Voting booth**: a voting booth that allows polling. A poll is a question with up to 10
   replies and an optional write-in, single-choice or multiple-choice (pick N); a poll can be
   made required at login. RBAC decides who can create polls, set one required, vote, see the
@@ -810,8 +905,9 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   board's). Per-user pointers honoured when a packet is built; "reset pointers" and "set
   pointers to date". CONTROL.DAT, MESSAGES.DAT and *.NDX generation options; BULLETIN, NEWS
   and GOODBYE files included. REP import validates the packet's BBS ID, rejects foreign
-  packets and handles stale pointers. Depends on: message bases, private messages, file
-  transfer on classic connections, external archivers.
+  packets and handles stale pointers. Each role has a ceiling on packet size and message
+  count, and each user sets their own within it, never above. Depends on: message bases,
+  private messages, file transfer on classic connections, external archivers.
 - **FTP and FTPS server (uploading and downloading files)**: a secure FTP server in
   `hadv-service`, supporting standard FTP and secure FTPS (SSL/TLS). Port binding and
   listening addresses configurable; by default the normal ports, TCP/21 for FTP and TCP/990
@@ -893,6 +989,13 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   CAPTCHA, guards web registration, on by default. New-user feedback to the sysop: no,
   optional or required with a minimum length; default no. Depends on: accounts and login,
   user profile and new-user questions, SMTP client, content moderation.
+- **Private mail privacy**: a stated policy, disclosed in the terms of service at
+  registration: the board offers no way to read a user's mail except a break-glass read by
+  account #1 alone, not the Sysop role, always audited. The policy is honest that whoever runs
+  the server can technically read the database, and that encryption at rest guards against a
+  stolen disk or backup, not against the holder of the keys. A private message its recipient
+  reports reaches the moderation queue by their choice and needs no break-glass. A sysop
+  cannot widen the policy. Depends on: private messages, registration gates.
 - **Advisory signals**: at registration the address is checked against the Tor exit list and
   abuse feeds, downloaded as lists and checked on the board, never looked up one user at a
   time with a third party; a match is a flag for the sysop, never a block. An account sharing
@@ -909,6 +1012,25 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   ships as a sandbox until promoted: no links in posts, no attachments, no private mail to
   users who do not follow them, no doors. Depends on: RBAC, user statistics, content
   moderation; the follower rule on social media features.
+- **Achievements**: badges from rules the Sysop defines, like the promotion and demotion rules
+  and with the same mechanism, AND and OR over the same metrics, awarding a badge instead of
+  moving a role. The themes draw the badges, in ANSI on the terminal. The shipped rules lean on
+  milestones (first post, one-year member, ten-year member) rather than volume. Depends on:
+  user statistics, automatic promotion and demotion.
+- **One-liners and friends**: the engine keeps them, shared across servers, and exposes them
+  through `bbs.*`; the themes show them. One-liners in a fixed ring; rumors, anonymous
+  one-liners, optionally per area; Auto-Message, one login message replaced by the next
+  writer; Quote of the Day, written by the sysop, one at random on login; last callers, where
+  a private user does not appear and only what a profile makes public is shown, the console
+  keeping the full detail. All of it is user content: length limits, watched words,
+  reportable. A rumor is anonymous to users, not to staff. Depends on: scripting layer, who's
+  online, content moderation.
+- **BBS list**: a directory of other systems (Telnet, SSH, web) that users keep, exported as
+  JSON and RSS, with the compiled network nodelists and BBS lists browsable and searchable
+  from the same screen. A new entry goes to the moderation queue, and its submitter can edit
+  it afterwards. The board never connects to a listed host to check it; an entry shows when a
+  user last confirmed it. Depends on: content moderation, FTN networks, VirtualNET networks,
+  WWIV networks.
 - **Virus scanning and archive conversion**: uploads are virus scanned online, offline or in
   the background, chosen in `hadv-config` and `hadv-config-gui`. Online scans immediately
   after the upload and shows the user a progress screen; offline scans after the user has
@@ -958,11 +1080,15 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   from the WFC consoles (`hadv-console`, `hadv-console-gui`). Sysop only by default; the Sysop
   can grant the permission to other roles. A caller without ANSI gets line-by-line chat.
   Depends on: Waiting-for-Caller console, terminal negotiation.
+- **Sysop page**: a caller pages the sysop. Page hours and an available flag are configurable;
+  outside them, a page falls through to feedback mail. A page arrives as an alert in both
+  consoles, with the classic sound, and is answered with break-in chat, under its permission.
+  One page per caller per N minutes. Paging is a permission every role holds by default except
+  Guest. Depends on: sysop break-in chat, private messages, rate limits.
 
 ## Not yet described
 
-Storage (one storage registry shared by file areas, message attachments and more), social media
-features (the reaction model and the follow graph), notifications (the inbox and alerts that
-virus scanning, content moderation and sysop notification triggers send), feedback to the sysop
-(counted in BBS statistics, notified by sysop notification triggers), RIP graphics (offered as a
-terminal type in user preferences), and everything else the developer adds as it comes up.
+Storage (one storage registry shared by file areas, message attachments and more), feedback to
+the sysop (counted in BBS statistics, notified by sysop notification triggers), RIP graphics
+(offered as a terminal type in user preferences), and everything else the developer adds as it
+comes up.
