@@ -221,8 +221,10 @@ Recurring shapes ordinary review misses; every review prompt names them.
 
 AGPLv3 only, with the Scripting API Exception in `LICENSE.exception`: sysop-authored Lua
 scripts and themes using only the public `bbs.*` API are not derivative works. Forks, modified
-bindings and anything compiled into the engine remain AGPLv3. Apache-2.0, MIT, BSD and
-PostgreSQL-licence dependencies may be linked; LGPL only as a dynamically linked system library
-(GTK, Qt), and the Free Pascal runtime and LCL under their modified LGPL with its
-static-linking exception; audit every new one. Before changing any `bbs.*` binding, read the
+bindings and anything compiled into the engine remain AGPLv3. Apache-2.0, MIT, BSD,
+PostgreSQL-licence and Unicode License v3 (CLDR, ICU data) dependencies may be linked or
+embedded; LGPL only as a dynamically linked system library (GTK, Qt), and the Free Pascal
+runtime and LCL under their modified LGPL with its static-linking exception. Any other licence
+is admitted only once it is shown not to conflict with AGPLv3. Audit every new one, and ship
+each dependency's notice with the release. Before changing any `bbs.*` binding, read the
 scripting API spec's deprecation contract, which is what keeps that exception's promise.
