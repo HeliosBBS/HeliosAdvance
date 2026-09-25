@@ -76,7 +76,9 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   a pack before it is offered to users, to preview it. A pack does not assume 80x25: 132
   columns and tall terminals are part of the theme contract. When an update replaces a shipped
   theme, a file the sysop edited is found by comparing it with the shipped file's hash, and the
-  sysop's copy is set aside and the sysop told. Depends on: scripting layer.
+  sysop's copy is set aside and the sysop told. On legacy connections `/` starts a long command
+  (such as `/SYSOP`) in every theme, and no theme binds `/` as a hotkey; with hotkeys on, typing
+  `/` switches to line entry until Enter. Depends on: scripting layer.
 - **Certificates**: `hadv-cert` (TUI only) generates self-signed certificates and installs
   supplied ones; TLS Telnet, HTTPS and SSH host keys draw on it. ACME is not spoken by the
   engine; an ACME client uses `hadv-cert` to install what it obtained. Certificates reload
@@ -124,11 +126,17 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
 - **Terminal negotiation**: terminal capability negotiation shared by Telnet, SSH and
   WebSocket: CP437 or UTF-8, colour tier and screen size. xterm-256 and 24-bit colour in the
   theme colour model, with automatic downgrade to 16 colours; themes declare the tier they were
-  drawn for. Depends on: nothing.
+  drawn for. When auto-detection fails, the board asks, assumes ANSI or assumes ASCII, as the
+  sysop sets; default ask. Depends on: nothing.
 - **Telnet caller**: a caller connects over Telnet to a node and reaches the theme's welcome;
   option negotiation; connection limits, per-source throttling (one mechanism shared by every
-  caller surface, honouring the exempt-source list from accounts and login), idle timeouts. Off
-  by default. Default port TCP/23, default binding all addresses; whether it is on, the port and
+  caller surface, honouring the exempt-source list from accounts and login), idle timeouts.
+  Options negotiated: ECHO, SGA, BINARY, TTYPE, NAWS, NEW-ENVIRON and TSPEED; LINEMODE is
+  refused, because hotkeys and lightbars need a character at a time. NEW-ENVIRON may fill in the
+  login prompt but is never trusted to sign anyone in. Binary mode runs in both directions, so
+  8-bit CP437 arrives intact. A keepalive, every 60 seconds by default, finds a caller whose
+  connection has dropped. Each listener can have a pre-login banner, drawn by the theme. Off by
+  default. Default port TCP/23, default binding all addresses; whether it is on, the port and
   the binding all changeable in `hadv-config`. Depends on: servers, scripting layer, theme
   packs, languages, terminal negotiation. Touches the load tester.
 - **Accounts and login**: sign-up, login, sessions across servers, lockouts; a second factor
@@ -142,8 +150,12 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   input for this). Lockout is board-wide policy with one implementation that
   every surface's sign-in uses (Telnet, SSH, web, the Admin API), counted in the database so
   moving between servers or surfaces resets nothing. Account #1, always the main sysop
-  account, is never locked; any other account locks after x failed attempts for x amount of
-  time, both configurable in `hadv-config`. An account holding the Sysop or Co-Sysop role
+  account, is never locked; any other account locks after 5 failed attempts for 15 minutes by
+  default, both configurable in `hadv-config`. While an account is locked, sign-in asks for the
+  password and the second factor together and answers only success or failure, never which was
+  wrong: an owner with a second factor gets in with both right, an account without one stays
+  locked, and every locked account shows the same prompt; a few attempts per lock are allowed,
+  and counted. An account holding the Sysop or Co-Sysop role
   that is locked out a few times within a window is locked permanently until a sysop unlocks
   it (a Sysop account only by a Sysop). Failed sign-ins also slow the source down on every
   surface and every account: each failure from an address makes that address's next attempt
@@ -152,8 +164,29 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   covers addresses that stand for many callers (the HeliosSIP gateway, a load tester, a
   shared address). Every tunable here has a floor and a ceiling; loosening any of them, or
   adding an exempt source, warns loudly and needs the sysop's confirmation. The next
-  successful sign-in shows how many failures there were and from where. Depends on: scripting
-  layer, Telnet caller.
+  successful sign-in shows how many failures there were and from where, and when and from where
+  the last successful sign-in came. Password policy: a minimum length, optional character
+  classes, a maximum age and a reuse history, defaulting to 12 characters, no expiry and the
+  last 5 remembered; a password may be at least 64 characters long, with spaces and any
+  Unicode. After a sysop resets a password, the user must change it at the next login (default
+  yes). Concurrent logins: allow, deny, or deny on the same front end; default deny on the same
+  front end, offering to end the old session. Changing a password ends every other session.
+  The idle timeout is separate from the session time limit and set per front end, default 15
+  minutes. A setting, default yes, allows the Sysop to log in from outside sources rather than
+  only from the WFC. Depends on: scripting layer, Telnet caller.
+- **Breached-password check**: a new or changed password is checked against Have I Been
+  Pwned's Pwned Passwords, sending only the first five characters of its SHA-1 hash and nothing
+  else, so the service never sees the password. On by default; the sysop chooses warn or
+  block, default warn. Responses are cached by hash prefix for a limited time, never a password
+  or a full hash, and never linked to a user. When the service cannot be reached, the check is
+  skipped and logged, and the password is allowed. Depends on: accounts and login.
+- **Address bans**: the sysop bans an IP address or a range, with an optional expiry; a ban
+  applies before sign-in on every surface. A range wider than IPv4 /29 or IPv6 /48 gets the
+  same loud warning and confirmation as the Admin API's allow list. The server's own host
+  cannot be banned, and banning an exempt source warns loudly. A banned caller sees a "you are
+  banned" screen by default, or the connection closes silently, as the sysop chooses; the
+  shipped themes draw it as an animated ANSI ban hammer. No country blocking. Depends on:
+  accounts and login, IPv4 and IPv6, theme packs.
 - **Reserved and former usernames**: nobody can register these usernames, in any letter case:
   `!@-REMOTE-@!`, `!@-NETWORK-@!`, `GUEST`, `NEW`, `SIGNUP`, `DEMO`, `SYSOP`, `W`, `WANDERER`,
   `ANONYMOUS`, `hostmaster`, `postmaster`, `abuse`, `webmaster`, `admin`, `administrator`,
@@ -169,29 +202,60 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   becoming `.` or `_`) goes through the same uniqueness and confusable check, so "Dark Lord"
   and "Dark.Lord" cannot both exist. The maximum handle length fits the name fields of the
   networks the board supports (FTN and QWK among them; the brainstorm confirms the limits).
-  Spaces are revisited if a compatibility issue turns up. Depends on: accounts and login.
+  Spaces are revisited if a compatibility issue turns up. A handle may not be purely numeric,
+  since commands accept a user number or a name. User numbers have no cap; a permanently
+  deleted number is never reused, and a legacy format that cannot carry a large number deals
+  with it at its own boundary. When an upgrade changes the confusables data, every stored
+  skeleton is recomputed automatically and the sysop is told of any collisions between
+  existing accounts. Depends on: accounts and login.
 - **Username change**: a user can change their own username; how often is a sysop-configurable
-  setting. The old username becomes a former handle. Depends on: reserved and former
+  setting. The old username becomes a former handle. The Sysop and Co-Sysop see every handle
+  an account has had; moderators see "formerly known as" for a configurable period after a
+  change, and regular users never do. The history is deleted with the account. The sysop guide
+  notes that posts already sent to networks keep the old name. Depends on: reserved and former
   usernames.
 - **Language choice**: a user picks from the available languages when creating their account
   and can change it in their preferences. Depends on: languages, accounts and login.
 - **Role-based access control**: roles carry permissions and configuration (upload/download
   ratio, whether 2FA is required, and the like). Every gate fails closed; every operator action
-  is audited. Seeded roles, by fixed ID because names are editable: 1 Sysop, 2 Co-Sysop,
-  3 User, 4 Guest, 5 New User. Sysop: super user, unrestricted global access; cannot be
-  deleted; display name changeable, access not editable. Co-Sysop: limited administration
-  (users, file areas, message bases); cannot touch system configuration, promote anyone to
-  Sysop or Co-Sysop, take over Sysop or Co-Sysop accounts, or lock out a Sysop; cannot be
-  deleted; editable (display name, additional restrictions). User: regular registered users;
-  cannot be deleted; editable. Guest: not signed in; cannot be deleted; editable. New User:
-  baseline probationary access; can be deleted; fully editable. Account #1 is always the main
-  sysop account and owner of the system. The Sysop role requires 2FA by default; the sysop may
-  turn that off for the role. Sysop and Co-Sysop hold the permission to see everyone in
-  who's-online, private or blocked, by default. Depends on: accounts and login.
+  is audited. Seeded roles, by fixed ID because names are editable: 1 Sysop, 2 Co-Sysop, 3 User,
+  4 Guest, 5 New User. Sysop: super user, unrestricted global access; cannot be deleted; display
+  name changeable, access not editable. Co-Sysop: limited administration (users, file areas,
+  message bases); cannot touch system configuration, promote anyone to Sysop or Co-Sysop, take
+  over Sysop or Co-Sysop accounts, or lock out a Sysop; cannot be deleted; editable (display
+  name, additional restrictions). User: regular registered users; cannot be deleted; editable.
+  Guest: not signed in; cannot be deleted; editable. New User: baseline probationary access; can
+  be deleted; fully editable. Account #1 is always the main sysop account and owner of the
+  system. The Sysop and Co-Sysop roles require 2FA by default; each role's second factor is
+  Required, Optional or Disabled. Every permission can be granted to other roles, except those a
+  brief fixes to the Sysop role or to account #1. A role in use cannot be deleted; the refusal
+  names what uses it. Guest, on the web, reads public areas and cannot post, upload or run
+  doors; Guest downloads only where the sysop turns that on for an area, off by default; Guest
+  over Telnet, SSH and FTP may come later. Sysop and Co-Sysop hold the permission to see
+  everyone in who's-online, private or blocked, by default. Depends on: accounts and login.
+- **Rate limits**: posting, private mail, uploads, search and registration are each limited
+  per account and per IP address, by one mechanism on every front end, with a clear "try again
+  in N seconds". The defaults are generous and roles can override them; Sysop and Co-Sysop get
+  high limits, not none. An IPv6 source counts by its prefix; exempt sources skip the per-IP
+  limit while their callers' per-account limits still apply. An area's slow mode stays the
+  moderators' own tool. Depends on: accounts and login, RBAC, IPv4 and IPv6.
+- **Bot and service accounts**: a flag for accounts that post automatically. A bot is left out
+  of who's online, leaderboards and statistics, cannot log in interactively (its credential is
+  an API token), is labelled visibly to users, such as "[bot]", and cannot hold the Sysop or
+  Co-Sysop role. Depends on: accounts and login, RBAC.
+- **Time limits and time bank**: each role can have a daily time limit, a per-call limit, a
+  maximum number of calls per day and a time-remaining warning, all off by default; whether
+  they apply to web sessions is decided in the brainstorm. A time bank, built into the board
+  rather than a door, lets a user deposit and withdraw daily time, with caps per role; using it
+  is a permission every role holds by default except New User and Guest. Depends on: RBAC.
 - **Who's online**: a list of who is currently online on the BBS; see classic BBSes for
   examples. A user whose profile is private does not show up in who's online, and a user does
   not see someone they have blocked. Sysop and Co-Sysop hold a permission to see everyone,
-  bypassing a private profile or a block. Depends on: role-based access control.
+  bypassing a private profile or a block. Each caller shows a status line they set and their
+  idle time, per front end; users see coarse activity (the front end, in a door, reading
+  messages), while the sysop's console keeps the full detail, and do not disturb shows here.
+  The status line is user content: length-limited, checked against watched words and
+  reportable. Depends on: role-based access control.
 - **Account deletion**: a user can delete their own account after a confirmation (typing
   something, or their second factor); account #1, the main sysop account, cannot delete
   itself. Deleting an account, whether the user, the Sysop or maintenance does it, puts it in
@@ -208,12 +272,28 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   to the former-handle period. The Sysop can delete an account permanently straight from the
   virtual deleted state, to comply with the EU GDPR; its posts, uploads and other data then
   show the placeholder [Deleted User]. Research whether and how the GDPR applies to the audit
-  log and other logs. Depends on: accounts and login, RBAC, event scheduler.
+  log and other logs. An email warns the user N days before their role's inactivity limit,
+  default 14, when the board can send email and the account has an address; it is plain, with
+  no link asking for a password, just "log in to keep your account". The sysop turns the
+  warning on or off in the configuration tools, default on. Depends on: accounts and login,
+  RBAC, event scheduler.
 - **Second factor**: TOTP (RFC 6238), with self-service enrolment in text mode and by QR code
   on connections that support it; passkeys where the surface allows; required per role; the
-  initial #1 Sysop enrols during first-run setup. Depends on: accounts, RBAC. Touches the Portal.
+  initial #1 Sysop enrols during first-run setup. Ten single-use recovery codes, stored hashed,
+  are shown once at enrolment and can be regenerated. Depends on: accounts, RBAC. Touches the
+  Portal.
 - **Account recovery**: a user who has forgotten their password, or lost their second factor,
-  gets their account back. Depends on: accounts and login, second factor.
+  gets their account back. The Sysop, or a Co-Sysop within their scope, can clear a user's
+  second factor; if the role requires one, the user enrols again at the next login. Clearing it
+  is audited and the user is told by inbox and email; a Co-Sysop cannot clear a Sysop's or a
+  Co-Sysop's. The sysop guide says to verify who is asking first. Depends on: accounts and
+  login, second factor.
+- **App passwords**: protocols that cannot do a second factor (FTP and FTPS, and later
+  newsreader and mail-client access) refuse the main password of an account with a second
+  factor and take an app password instead: named, limited to the protocols it is for, shown
+  once, stored hashed and revocable on its own. Any account may use them; an account with a
+  second factor must. The FTP virtual accounts for network nodes are separate. Depends on:
+  accounts and login, second factor.
 - **User profile and new-user questions**: the board stores, per account: deleted status, user
   number, handle, real name, company name, BBS name, email address, gender (a single gender
   code), birth date, address, location, zip code and phone number. Each question a new user is
@@ -226,7 +306,10 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   No); address and zip code (default No; US and international); location, such as city, state
   and country (default Optional; optionally require a comma, default No); phone number (default
   No; US and international). A feature that needs a field the user has not given (real name,
-  email address, gender, age) cannot be used by that user. Depends on: accounts and login.
+  email address, gender, age) cannot be used by that user. The email address is internet email
+  only, used for recovery, alerts and confirmations. A Sysop note, which the Sysop and
+  Co-Sysops read and edit, is personal data: it is part of a subject-access export and is
+  deleted with the account. Depends on: accounts and login.
 - **Telnet over TLS caller**: the Telnet experience over a TLS-wrapped listener. Off by default.
   Default port TCP/992, default binding all addresses; whether it is on, the port and the
   binding all changeable in `hadv-config`. Depends on: certificates, Telnet caller.
@@ -239,8 +322,13 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
 - **Web caller**: a browser reaches the board over HTTP, HTTPS and HTTP/3 and gets the selected
   theme's web side. Off by default. Default ports TCP/80 (HTTP), TCP/443 (HTTPS), UDP/443
   (QUIC); HTTP redirects to HTTPS by default; default binding all addresses; whether it is on,
-  the ports, the binding and the redirect all changeable in `hadv-config`. Depends on: scripting
-  layer, theme packs, certificates.
+  the ports, the binding and the redirect all changeable in `hadv-config`. HSTS is sent by
+  default only when the certificate is publicly trusted, with a modest duration, and never for
+  subdomains or preload unless the sysop asks. The shipped themes can be read without
+  JavaScript. Every message, file and profile has a stable permalink that survives moving an
+  area, with Open Graph metadata for link previews only on content a Guest can see; a link the
+  viewer cannot read gets the same not-found answer as one that does not exist. Depends on:
+  scripting layer, theme packs, certificates.
 - **Terminal-in-browser rendering**: the classic theme's terminal experience rendered in the
   browser: ANSI with animation and ANSI music. Web users can also play classic ANSI DOS games,
   carried over a WebSocket. The screen is not locked to a fixed 80x25 size that looks tiny on a
@@ -277,9 +365,17 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   DoorParty credentials live in the secret vault. `hadv-config` and `hadv-config-gui` can
   configure an instance. Web callers play legacy doors through terminal-in-browser rendering;
   doors built with the Door Kit are also drawn as HTML for web callers. Each door can have a
-  nightly maintenance hook, run by the event scheduler. Depends on: terminal capabilities,
-  account deletion, languages, sensitive data encrypted at rest, event scheduler; blocked on
-  the door hosting protocol (HeliosDoors).
+  nightly maintenance hook, run by the event scheduler. Per door: a daily and a per-call time
+  limit, off by default; whether door time comes from a separate pool, default no; who can run
+  it, and whether it is listed for users who cannot, default hidden; a cost in time-bank
+  minutes, default 0. Doors sit in categories and menus with a sort order and per-category
+  access. Usage is counted per user and per door: launches, total time, last played. High
+  scores the theme can show, and a wait queue for a full door (the user is told how many are
+  in it, the place is held only while they stay connected, a freed slot wakes the next waiter
+  rather than admitting them, any key abandons the wait), need the door hosting protocol to
+  carry them. Depends on: terminal capabilities, account deletion, languages, sensitive data
+  encrypted at rest, event scheduler, time limits and time bank; blocked on the door hosting
+  protocol (HeliosDoors).
 
 ## Operating the board
 
@@ -430,11 +526,27 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   account deletion, storage.
 - **Private messages**: user-to-user mail on the board. Depends on: accounts, RBAC, account
   deletion.
+- **Welcome mail**: each new user gets a welcome message from the sysop, from a template per
+  language, on by default; the shipped template is short and friendly. Depends on: private
+  messages, languages.
+- **Blocking and muting**: two verbs. Block a person, including a user from an external
+  network, by name and network address: they disappear for the blocker (posts, netmail, who's
+  online, the user list) and cannot contact them (no private mail, mentions or chat
+  invitations); they are not told, and their mail is refused with the same answer as for any
+  unavailable user. The block list is editable. Mute a person, a thread or an area: the content
+  is hidden or collapsed while the person still exists, synced across front ends. Nobody can
+  block moderation: notices from the Sysop and moderators, bans and appeal replies always
+  arrive, and moderators acting as moderators still see a blocked user's content. Depends on:
+  accounts and login, private messages, message bases.
 - **File transfer on classic connections**: upload and download protocols over Telnet and SSH
   sessions. Depends on: Telnet and SSH callers, file bases.
 - **SSH public-key login**: a user uploads a public key (on the web, or by file transfer on a
-  classic connection) and logs in with it; a required second factor still applies. Depends
-  on: SSH caller, accounts, second factor, file transfer.
+  classic connection) and logs in with it; a required second factor still applies. FIDO2
+  security keys (`ed25519-sk`, `ecdsa-sk`) are accepted, and a signature carrying the
+  user-verified flag (a PIN or biometric, not just a touch) satisfies the second factor on its
+  own, checked at every login; a touch-only signature still gets the TOTP prompt. The sysop can
+  remove a user's key: audited, the user told by inbox and email, and a Co-Sysop cannot remove
+  a Sysop's or a Co-Sysop's. Depends on: SSH caller, accounts, second factor, file transfer.
 - **Full-screen text editor**: a full-screen text editor for legacy protocols, with ANSI
   cursor positioning, automatic word wrap, insert and overwrite modes, block and line
   operations, inline colour code support, extended ASCII support, message quoting and CTRL
@@ -457,6 +569,25 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   validation (DKIM, SPF, DMARC). The goal is not for users to set up an email client and send
   through the board; that may be a later feature. Depends on: private messages, sensitive data
   encrypted at rest.
+- **Sessions and devices**: a user sees their active sessions across Telnet, SSH, web and FTP
+  (the front end, the IP address, the last activity) and ends one or all of them. A login from
+  a new network (an IPv4 /24 or IPv6 /48 not seen before) or a new front end alerts the user,
+  on by default: in the inbox always, and by email once the board can send it. App passwords
+  are listed here too. Depends on: accounts and login, IPv4 and IPv6, SMTP client.
+- **Step-up re-authentication**: one mechanism, used by user self-service, by administrators'
+  destructive commands and by the console turning a service on. A user gives their password
+  or second factor again before changing their email address or password, disabling TOTP,
+  deleting their account, adding an SSH key or regenerating recovery codes; a short window
+  after a step-up covers several changes. An email address change is confirmed to both
+  addresses, and the old one gets a "this wasn't me" link that reverses the change within a
+  set period. The Sysop's and Co-Sysops' destructive commands inside a session need a step-up
+  on a cadence the sysop sets (per login, per command or per time interval), default every 15
+  minutes. Depends on: accounts and login, second factor, SMTP client.
+- **Data export**: a user exports their messages, mail, uploads list and profile as zip or
+  JSON, one export every 7 days by default, after a step-up, delivered through the board and
+  never emailed; staff notes are left out. The Sysop exports everything the board holds about
+  one user, the Sysop note included, to answer a GDPR subject-access request. Depends on:
+  accounts and login, private messages, message bases, file bases, step-up re-authentication.
 - **SMTP server (receiving email)**: the board receives email for its users. Strict anti-relay
   rules: accept only email for local users and local domains. Port binding and listening
   addresses configurable. Maximum simultaneous connections configurable, default 100, shared
@@ -497,19 +628,40 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   export as CSV or JSON from the Admin API and the console. A histogram of the busiest hours
   and days, and the peak concurrent sessions with the time they occurred. Depends on: user
   statistics, Waiting-for-Caller console, event scheduler.
+- **Login and logoff sequence**: the shipped themes' behaviour, not an engine-level sequence
+  editor: pre-login banner, ANSI detection, login menu, welcome, news, mail check and new-scan
+  prompt, in an order easy to change inside the theme; a pre-login menu (apply, callers
+  online, system info, log off), where callers online is the board-wide count only; "press any
+  key" with configurable text, abortable and skipped in expert mode; a logoff screen with a
+  random tagline and today's statistics, and a feedback prompt on the first logoff. The engine
+  provides system news with a per-user last-read marker, so news shows when it has changed, a
+  first-logoff flag and today's statistics, through `bbs.*`. Depends on: theme packs, user
+  statistics, BBS statistics.
 - **User preferences**: each user sets, with its default: language and time zone (the
   board's); short date format such as MM/DD/YYYY, and time format, 12 or 24 hour (the board's);
   theme (the default theme set in `hadv-config` and `hadv-config-gui`); terminal type:
   auto-detect, extended ASCII, ANSI or RIP (auto-detect); colour: auto-detect, yes or no
   (auto-detect); screen length and width: auto-detect or a number (auto-detect); expert mode,
   menus hidden unless `?` is pressed (no); pause at the end of each screen (yes); forward all
-  netmail and email to the external email address (no); clear screen between messages (no);
+  netmail and email to the user's forwarding destination (no), with the forwarding format, the
+  full message or a notification only (notification only); clear screen between messages (no);
   ask for a new message scan (no); remember the current message area (no) and file area (no);
   default download protocol, from the protocols the system defines (ZModem); hang up after a
   file transfer (no); editor: full-screen or line, on classic connections only (full-screen);
   message reading order: forward, reverse or threaded (forward); show signature on posts
-  (yes); private profile (yes, as accounts and login describes). Some of these may be better
-  stored in a separate table linked to the user. Depends on: language choice, time zones and
+  (yes); private profile (yes, as accounts and login describes); menu style, lightbar, classic
+  hotkey or numbered, offered only where the user's theme draws it (the theme's); hotkeys, a
+  single key without Enter (yes); quote style and prefix (`> ` with initials); messages and
+  files per screen (screen length minus 2); available for chat or do not disturb (available),
+  which blocks chat requests and pages from users but not the Sysop's break-in, and is
+  separate from quiet hours. The forwarding destination is a network and an address: the user
+  picks from every network the board supports, the Internet included, and types the address,
+  which that network's own rules check and which holds everything the network needs to reach
+  them (for FTN a name and a node, checked against the nodelist; for WWIV a number or a name at
+  a node). An internet forwarding address is confirmed before any mail goes to it; there is one
+  destination per user; forwarding over a BBS network warns once that netmail passes through
+  hubs as plain text. Some of these may be better stored in a separate table linked to the
+  user. Depends on: language choice, time zones and
   daylight saving, theme packs, message bases, private messages, file transfer on classic
   connections, SMTP client, full-screen text editor, basic line text editor, terminal
   capabilities.
@@ -606,8 +758,9 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   host and subscriber model, add and drop sub requests, a host designated per sub. BBSLIST,
   CONNECT and CALLOUT data maintained and distributed. Packet transport by BinkP
   through `hadv-service`, with per-link passwords. WWIV email routed inbound and outbound to local
-  users. Heart codes translated on import and export (see attribute codes). Depends on: mail
-  networks, attribute codes.
+  users. A user numbered above 65,535 is addressed by name, never by a truncated number. Heart
+  codes translated on import and export (see attribute codes). Depends on: mail networks,
+  attribute codes.
 - **Usenet (`hadv-nntp`)**: an NNTP client and tosser for Usenet. Multiple NNTP networks (such as "Usenet"
   and "InterNetNews"), each with several Usenet servers for backfill and one designated for
   sending posts. Nothing is imported automatically: the sysop sets up each newsgroup as a
@@ -653,6 +806,33 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   from `hadv-console` and `hadv-console-gui`, which show when content is waiting. Each
   moderator can opt in or out of real-time alerts when a new item enters the queue. Depends
   on: message bases, file bases, private messages, Waiting-for-Caller console.
+- **Registration gates**: whether new users may join: yes, no, a password, invite (invite links
+  with a quota per role, and an invite tree the sysop can see) or approve (a questionnaire
+  whose answers go to the moderation queue); default yes. Verification by email, by sysop
+  approval or both; default email when the board can send it, otherwise sysop approval; email
+  verification cannot be chosen while the email question is set to No. An account that never
+  verifies is deleted when a short window passes. Terms of service, written by the sysop, are
+  shown and required at registration; the version each user accepted is kept, and a changed
+  version is accepted again. A self-hosted proof-of-work challenge, never a third-party
+  CAPTCHA, guards web registration, on by default. New-user feedback to the sysop: no,
+  optional or required with a minimum length; default no. Depends on: accounts and login,
+  user profile and new-user questions, SMTP client, content moderation.
+- **Advisory signals**: at registration the address is checked against the Tor exit list and
+  abuse feeds, downloaded as lists and checked on the board, never looked up one user at a
+  time with a third party; a match is a flag for the sysop, never a block. An account sharing
+  an IP address with another gets an advisory, skipping the exempt-source list. No
+  geolocation. Depends on: registration gates.
+- **Automatic promotion and demotion**: the Sysop writes rules in the configuration tools that
+  move users between roles on metrics, with AND and OR conditions; the metrics include read
+  activity (messages read, days visited, likes received) and count reports received against
+  the user. There can be many rules, and users never see them. One promotion rule ships,
+  moving users out of New User after at least 3 calls on at least 2 different days and at
+  least 20 minutes online in total; the sysop can delete it. No demotion rule ships. A rule
+  never moves a user into a role that holds administrative or moderation permissions, and a
+  demotion rule sends its proposal to the moderation queue for a person to confirm. New User
+  ships as a sandbox until promoted: no links in posts, no attachments, no private mail to
+  users who do not follow them, no doors. Depends on: RBAC, user statistics, content
+  moderation; the follower rule on social media features.
 - **Virus scanning and archive conversion**: uploads are virus scanned online, offline or in
   the background, chosen in `hadv-config` and `hadv-config-gui`. Online scans immediately
   after the upload and shows the user a progress screen; offline scans after the user has
@@ -705,9 +885,8 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
 
 ## Not yet described
 
-Storage (one storage registry shared by file areas, message attachments and more), social
-media features (the reaction model and the follow graph), blocking a user (accounts and login,
-who's online and multi-user chat honour it), notifications (the inbox and alerts that virus
-scanning, content moderation and sysop notification triggers send), feedback to the sysop
-(counted in BBS statistics, notified by sysop notification triggers), RIP graphics (offered as
-a terminal type in user preferences), and everything else the developer adds as it comes up.
+Storage (one storage registry shared by file areas, message attachments and more), social media
+features (the reaction model and the follow graph), notifications (the inbox and alerts that
+virus scanning, content moderation and sysop notification triggers send), feedback to the sysop
+(counted in BBS statistics, notified by sysop notification triggers), RIP graphics (offered as a
+terminal type in user preferences), and everything else the developer adds as it comes up.
