@@ -42,14 +42,16 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   languages.
 - **Configuration**: every board setting has a key, default and kind; `hadv-config` (TUI and
   CLI; the CLI is for automation) and `hadv-config-gui` expose all of them with parity. Most
-  settings are tunable there. Defaults are secure by default; loosening is the sysop's
-  explicit choice. Runs on the server or on a separate computer for remote administration
-  (the board hosted at a cloud provider, configured from the sysop's home computer as if it
-  were local). Configuration changes are held until applied. Sign-in by the Sysop role only;
-  no one can grant that permission to another role. Each server's database connection pool
-  size is a setting, and the setting notes that every server's pool counts against the
-  database's connection limit. Depends on: servers, remote
-  administration, classic text-mode interface.
+  settings are tunable there. Defaults are secure by default; loosening is the sysop's explicit
+  choice. Runs on the server or on a separate computer for remote administration (the board
+  hosted at a cloud provider, configured from the sysop's home computer as if it were local).
+  Configuration changes are held until applied. Sign-in by the Sysop role only; no one can grant
+  that permission to another role. Each server's database connection pool size is a setting, and
+  the setting notes that every server's pool counts against the database's connection limit. A
+  release that changes a setting's default never loosens an existing board silently: on upgrade,
+  a board that never set that setting keeps the old value, stored as if the sysop had set it; a
+  tightened default applies; both are listed for the sysop after the upgrade, beside any new
+  permissions. Depends on: servers, remote administration, classic text-mode interface.
 - **Sensitive data encrypted at rest**: user passwords stored as a hash (the previous system
   used Argon2id); a secret vault in the database that every server can read and decrypt,
   holding network passwords and other sensitive values each server needs (the previous system
@@ -256,21 +258,24 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   and who got them. The direction for the brainstorm: only account #1 itself, or the local
   operator at the server's own host, can change account #1's password, second factor, email
   address, SSH keys or role; removing a key or ending a session, which can only lock #1 out, is
-  not barred. Seeded roles, by fixed ID because names are editable: 1 Sysop, 2 Co-Sysop, 3 User,
-  4 Guest, 5 New User. Sysop: super user, unrestricted global access; cannot be deleted; display
-  name changeable, access not editable. Co-Sysop: limited administration (users, file areas,
-  message bases); cannot touch system configuration, promote anyone to Sysop or Co-Sysop, take
-  over Sysop or Co-Sysop accounts, or lock out a Sysop; cannot be deleted; editable (display
-  name, additional restrictions). User: regular registered users; cannot be deleted; editable.
-  Guest: not signed in; cannot be deleted; editable. New User: baseline probationary access; can
-  be deleted; fully editable. Account #1 is always the main sysop account and owner of the
-  system. The Sysop and Co-Sysop roles require 2FA by default; each role's second factor is
-  Required, Optional or Disabled. Every permission can be granted to other roles, except those a
-  brief fixes to the Sysop role or to account #1. A role in use cannot be deleted; the refusal
-  names what uses it. Guest, on the web, reads public areas and cannot post, upload or run
-  doors; Guest downloads only where the sysop turns that on for an area, off by default; Guest
-  over Telnet, SSH and FTP may come later. Sysop and Co-Sysop hold the permission to see
-  everyone in who's-online, private or blocked, by default. Depends on: accounts and login.
+  not barred. Open for the brainstorm: handing the board to a new sysop, when account #1 carries
+  the old sysop's handle and posts, by transferring ownership to another Sysop account or by
+  handing over #1's credentials. Seeded roles, by fixed ID because names are editable: 1 Sysop,
+  2 Co-Sysop, 3 User, 4 Guest, 5 New User. Sysop: super user, unrestricted global access; cannot
+  be deleted; display name changeable, access not editable. Co-Sysop: limited administration
+  (users, file areas, message bases); cannot touch system configuration, promote anyone to Sysop
+  or Co-Sysop, take over Sysop or Co-Sysop accounts, or lock out a Sysop; cannot be deleted;
+  editable (display name, additional restrictions). User: regular registered users; cannot be
+  deleted; editable. Guest: not signed in; cannot be deleted; editable. New User: baseline
+  probationary access; can be deleted; fully editable. Account #1 is always the main sysop
+  account and owner of the system. The Sysop and Co-Sysop roles require 2FA by default; each
+  role's second factor is Required, Optional or Disabled. Every permission can be granted to
+  other roles, except those a brief fixes to the Sysop role or to account #1. A role in use
+  cannot be deleted; the refusal names what uses it. Guest, on the web, reads public areas and
+  cannot post, upload or run doors; Guest downloads only where the sysop turns that on for an
+  area, off by default; Guest over Telnet, SSH and FTP may come later. Sysop and Co-Sysop hold
+  the permission to see everyone in who's-online, private or blocked, by default. Depends on:
+  accounts and login.
 - **Rate limits**: posting, private mail, uploads, search and registration are each limited
   per account and per IP address, by one mechanism on every front end, with a clear "try again
   in N seconds". The defaults are generous and roles can override them; Sysop and Co-Sysop get
@@ -374,8 +379,12 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   subdomains or preload unless the sysop asks. The shipped themes can be read without
   JavaScript. Every message, file and profile has a stable permalink that survives moving an
   area, with Open Graph metadata for link previews only on content a Guest can see; a link the
-  viewer cannot read gets the same not-found answer as one that does not exist. Depends on:
-  scripting layer, theme packs, certificates; its permalinks on message bases and file bases.
+  viewer cannot read gets the same not-found answer as one that does not exist. Mobile is a
+  first-class front end, as every other connection type is: the web side works fully in a
+  phone's browser, and HeliosPortal's installable app (PWA) is a first-class mobile client.
+  Whether search engines may index Guest-visible content is a setting per board and per area,
+  off by default. Depends on: scripting layer, theme packs, certificates; its permalinks on
+  message bases and file bases.
 - **Terminal-in-browser rendering**: the classic theme's terminal experience rendered in the
   browser: ANSI with animation and ANSI music. Web users can also play classic ANSI DOS games,
   carried over a WebSocket. The screen is not locked to a fixed 80x25 size that looks tiny on a
@@ -397,8 +406,8 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   browser. Depends on: terminal negotiation, terminal capabilities, theme packs.
 - **Modern theme**: rich HTML on the web and a lightbar ANSI system on the terminal; shipped;
   the fallback. Its web side takes advantage of modern web design and has a modern social-media
-  feel, while still reaching everything the board offers. Depends on: theme packs, Telnet
-  caller, web caller.
+  feel, while still reaching everything the board offers, and is designed for a phone as much as
+  for a desktop. Depends on: theme packs, Telnet caller, web caller.
 - **Classic theme**: strictly text-based; shipped; the web server renders it by conversion.
   The sysop can delete it, and reinstall it from the release. Depends on: theme packs, Telnet
   caller, terminal-in-browser rendering.
@@ -535,6 +544,11 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   sysop may skip the backup, with a loud warning. Restoring that backup to test it is
   configurable. After an install or an upgrade the schema is checked against what the
   migrations should have produced. Depends on: servers, nodes and one board.
+- **Backup and restore**: the whole board (the database, files, theme and language packs, and
+  the configuration) is backed up on a schedule the sysop sets, keeping a number of copies they
+  choose, optionally copied off the server, and can be restored onto the same install or a fresh
+  one by a documented procedure that is itself tested; secrets travel only encrypted; a failed
+  backup alerts the sysop. Depends on: event scheduler, database upgrades, storage.
 - **Auto-update**: a server updates itself from the published releases, verifying the
   release's signature and build-provenance attestation against the project's publishing
   identity before anything is applied (supply-chain protection built on the git and release
@@ -768,13 +782,17 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
 - **SMTP client (sending email)**: the board delivers outbound email directly to destination
   mail servers, or forwards it to a dedicated SMTP relay configured in `hadv-config` and
   `hadv-config-gui`; configuring a relay automatically disables direct delivery (possibly a
-  dynamic toggle). Per-domain rate limiting, thresholds configurable, so destination servers
-  do not block the board. A robust local mail queue for deferrals and retries, with
-  configurable exponential backoff for connection and delivery retries. DKIM signing; ARC
-  (Authenticated Received Chain); modern forwarding mechanics that preserve upstream
-  validation (DKIM, SPF, DMARC). The goal is not for users to set up an email client and send
-  through the board; that may be a later feature. The sysop guide covers the SPF, DKIM and
-  DMARC DNS records and how to check them. Depends on: private messages, sensitive data
+  dynamic toggle). The relay, a smart host, is for hosting and cloud providers that will not let
+  a server deliver mail itself; it signs in with its own credentials, kept in the secret vault,
+  over TLS, required. Per-domain rate limiting, thresholds configurable, so destination servers
+  do not block the board. A robust local mail queue for deferrals and retries, with configurable
+  exponential backoff for connection and delivery retries. DKIM signing; ARC (Authenticated
+  Received Chain); modern forwarding mechanics that preserve upstream validation (DKIM, SPF,
+  DMARC). The goal is not for users to set up an email client and send through the board; that
+  may be a later feature. When a user's own address keeps bouncing, the board marks it
+  undeliverable, stops sending to it, and tells the user at their next login. Sending follows
+  the same best practice as the SMTP server entry states. The sysop guide covers the SPF, DKIM
+  and DMARC DNS records and how to check them. Depends on: private messages, sensitive data
   encrypted at rest.
 - **Sessions and devices**: a user sees their active sessions across Telnet, SSH, web and FTP
   (the front end, the IP address, the last activity) and ends one or all of them. A login from
@@ -849,20 +867,22 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   notifications, and a scheduled post can announce an event. Creating events is a permission,
   held by Sysop and Co-Sysop by default. Depends on: notifications, scheduled posts,
   role-based access control.
-- **SMTP server (receiving email)**: the board receives email for its users. Strict anti-relay
-  rules: accept only email for local users and local domains. Port binding and listening
-  addresses configurable. Maximum simultaneous connections configurable, default 100, shared
-  across the SMTP, POP3 and IMAP servers. The SMTP server and each transport mode can be enabled
-  and disabled individually in configuration, and all are off by default. The normal internet
-  ports by default: TCP/25 receives from other mail servers, with STARTTLS offered and plain
-  text accepted from a server that does not use it, for legacy network compatibility; TCP/587
-  (STARTTLS) and TCP/465 (implicit TLS, SMTPS) are the submission ports for users' email
-  clients, a later feature. Per-user address format: `handle@domain`, `first.last@domain` or a
-  user-chosen alias, default `handle@domain`. Per-user address aliases; a catch-all or
-  postmaster destination. The mailbox quota is the one private messages defines. Maximum
-  accepted message size and maximum attachment size, default 25 MB. The board's private mail and
-  external email share one store. Depends on: private messages, certificates, user profile and
-  new-user questions.
+- **SMTP server (receiving email)**: the board receives email for its users. The board is not a
+  general-purpose mail server: its mail features exist for the board's own benefit, follow
+  current best practice and security guidance for mail, and never make it an open relay, which a
+  test proves. Strict anti-relay rules: accept only email for local users and local domains.
+  Port binding and listening addresses configurable. Maximum simultaneous connections
+  configurable, default 100, shared across the SMTP, POP3 and IMAP servers. The SMTP server and
+  each transport mode can be enabled and disabled individually in configuration, and all are off
+  by default. The normal internet ports by default: TCP/25 receives from other mail servers,
+  with STARTTLS offered and plain text accepted from a server that does not use it, for legacy
+  network compatibility; TCP/587 (STARTTLS) and TCP/465 (implicit TLS, SMTPS) are the submission
+  ports for users' email clients, a later feature. Per-user address format: `handle@domain`,
+  `first.last@domain` or a user-chosen alias, default `handle@domain`. Per-user address aliases;
+  a catch-all or postmaster destination. The mailbox quota is the one private messages defines.
+  Maximum accepted message size and maximum attachment size, default 25 MB. The board's private
+  mail and external email share one store. Depends on: private messages, certificates, user
+  profile and new-user questions.
 - **POP3 client (receiving email)**: the board retrieves inbound mail from a catch-all mailbox
   on an external POP3 server, over POP3 or POP3S (SSL/TLS), and automatically parses and
   routes it to the right internal user. It generates a bounce when the recipient does not
@@ -982,8 +1002,11 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   a subscriptions screen for each network: it reads the network's lists of subs, echoes and file
   areas, shows what the board subscribes to and what it hosts, and subscribes and unsubscribes
   in bulk, mapped to existing areas or new ones, sending the requests through the tossers with
-  the per-area prompts message bases already has. Depends on: remote administration, message
-  bases, private messages, cross-server task ownership.
+  the per-area prompts message bases already has. Text is kept as UTF-8 and converted at each
+  network's boundary: exported in the network's character set, with a stated replacement for a
+  character it cannot carry, and imported by the character set it declares (FTN's CHRS line) or
+  the network's default. Depends on: remote administration, message bases, private messages,
+  cross-server task ownership.
 - **FTN networks (`hadv-fido`)**: multiple FTN networks and multiple AKAs per network, with AKA
   matching on export. NODELIST and NODEDIFF filenames configurable per network; when they
   arrive by TIC the nodelist is compiled, for viewing, searching and validating systems for
@@ -1070,45 +1093,48 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
 - **Content moderation**: one moderation queue where the Sysop, Co-Sysops and users with a
   moderator role see all content that needs human verification, in a single consolidated view
   covering every content type: pending message posts, pending file uploads and user-reported
-  content. The backend may be one queue or several aggregated at the presentation layer, as
-  long as the view is unified. The main view is a list of high-level subjects; selecting one
-  opens a detail view with full context (message text, file metadata and virus-scan results,
-  report reason). Actions depend on the type. Messages: approve, delete, view user, ban user,
-  skip, flag to #1 Sysop. Files: approve, move, delete, view user, ban user, skip, flag to #1
-  Sysop. Reported content: approve, delete, view user, view reporter, ban user, skip, reply to
-  reporter, message the content's creator, flag to #1 Sysop. Sequential review mode feeds
-  items one after another, where skip defers the item and loads the next; in the list, skip
-  returns to the list. Multi-select in the list allows mass approve and mass delete, to handle
-  floods and spam. A moderator claims an item so two moderators do not work the same one. RBAC
-  strictly governs what a user sees (only content they are allowed to moderate) and every
-  action and sub-action; the sysop defines the permissions (for example, a moderator who can
-  delete content but not ban users). Reported content is never visible to the user who posted
-  it, except the #1 Sysop. Flag to #1 Sysop raises a high-visibility notification or
-  indicator, such as a prominent red `!`. Every action (approvals, deletions, bans, skips,
-  escalations) is audited with timestamp, item, action and moderator; deleting content
-  prompts for a brief reason, kept with the audit entry or the user's profile. A report
-  carries a structured reason (spam, off-topic, abuse, illegal, or other with text) that
-  drives queue priority. When an active post collects a configurable number of reports from
-  different users, it is withheld from public view and moved to the queue ("withheld", not
-  "quarantined": virus scanning uses quarantine for an upload stuck on a scanner failure, and
-  one word for two states in two subsystems is a defect waiting to happen). A moderator can
-  approve and release a file the scanner flagged as infected: accountable, not the default,
-  and always writing an audit entry naming the verdict overridden. Per-user approval requires
-  approval of a specific user's next N posts, not just per area. The queue can be reviewed
-  from `hadv-console` and `hadv-console-gui`, which show when content is waiting. Each
-  moderator can opt in or out of real-time alerts when a new item enters the queue. Depends
-  on: message bases, file bases, private messages, Waiting-for-Caller console.
+  content. The backend may be one queue or several aggregated at the presentation layer, as long
+  as the view is unified. The main view is a list of high-level subjects; selecting one opens a
+  detail view with full context (message text, file metadata and virus-scan results, report
+  reason). Actions depend on the type. Messages: approve, delete, view user, ban user, skip,
+  flag to #1 Sysop. Files: approve, move, delete, view user, ban user, skip, flag to #1 Sysop.
+  Reported content: approve, delete, view user, view reporter, ban user, skip, reply to
+  reporter, message the content's creator, flag to #1 Sysop. Sequential review mode feeds items
+  one after another, where skip defers the item and loads the next; in the list, skip returns to
+  the list. Multi-select in the list allows mass approve and mass delete, to handle floods and
+  spam. A moderator claims an item so two moderators do not work the same one. RBAC strictly
+  governs what a user sees (only content they are allowed to moderate) and every action and
+  sub-action; the sysop defines the permissions (for example, a moderator who can delete content
+  but not ban users). Reported content is never visible to the user who posted it, except the #1
+  Sysop. Flag to #1 Sysop raises a high-visibility notification or indicator, such as a
+  prominent red `!`. Every action (approvals, deletions, bans, skips, escalations) is audited
+  with timestamp, item, action and moderator; deleting content prompts for a brief reason, kept
+  with the audit entry or the user's profile. A report carries a structured reason (spam,
+  off-topic, abuse, illegal, or other with text) that drives queue priority. When an active post
+  collects a configurable number of reports from different users, it is withheld from public
+  view and moved to the queue ("withheld", not "quarantined": virus scanning uses quarantine for
+  an upload stuck on a scanner failure, and one word for two states in two subsystems is a
+  defect waiting to happen). A moderator can approve and release a file the scanner flagged as
+  infected: accountable, not the default, and always writing an audit entry naming the verdict
+  overridden. Per-user approval requires approval of a specific user's next N posts, not just
+  per area. The queue can be reviewed from `hadv-console` and `hadv-console-gui`, which show
+  when content is waiting. Each moderator can opt in or out of real-time alerts when a new item
+  enters the queue. Deleted posts and files go to a moderators' trash for a period the sysop
+  sets, default 30 days, from which a moderator can restore them, and are purged when it ends; a
+  GDPR permanent deletion purges at once. Depends on: message bases, file bases, private
+  messages, Waiting-for-Caller console.
 - **Registration gates**: whether new users may join: yes, no, a password, invite (invite links
-  with a quota per role, and an invite tree the sysop can see) or approve (a questionnaire
-  whose answers go to the moderation queue); default yes. Verification by email, by sysop
-  approval or both; default email when the board can send it, otherwise sysop approval; email
-  verification cannot be chosen while the email question is set to No. An account that never
-  verifies is deleted when a short window passes. Terms of service, written by the sysop, are
-  shown and required at registration; the version each user accepted is kept, and a changed
-  version is accepted again. A self-hosted proof-of-work challenge, never a third-party
-  CAPTCHA, guards web registration, on by default. New-user feedback to the sysop: no,
-  optional or required with a minimum length; default no. Depends on: accounts and login,
-  user profile and new-user questions, SMTP client, content moderation.
+  with a quota per role, and an invite tree the sysop can see) or approve (a questionnaire whose
+  answers go to the moderation queue); default yes. Verification by email, by sysop approval or
+  both; default email when the board can send it, otherwise sysop approval; email verification
+  cannot be chosen while the email question is set to No. An account that never verifies is
+  deleted when a short window passes. Terms of service, written by the sysop, are shown and
+  required at registration; the version each user accepted is kept, and a changed version is
+  accepted again. A self-hosted proof-of-work challenge, never a third-party CAPTCHA, guards web
+  registration, on by default. New-user feedback to the sysop: no, optional or required with a
+  minimum length; default no. A minimum age to register, default 13, checked against the birth
+  date where the board asks for it and by the user's declaration where it does not. Depends on:
+  accounts and login, user profile and new-user questions, SMTP client, content moderation.
 - **Sign in with an identity provider**, for later: an OIDC or OAuth2 client that links an
   account to an outside identity, such as an organisation's, never bypassing registration
   gates, the terms of service or the New User sandbox. An outside login replaces the password,
@@ -1122,6 +1148,15 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   stolen disk or backup, not against the holder of the keys. A private message its recipient
   reports reaches the moderation queue by their choice and needs no break-glass. A sysop
   cannot widen the policy. Depends on: private messages, registration gates.
+- **Legal duties**, research first: the board helps a sysop meet the law that applies to a
+  service hosting other people's content, without claiming to make them compliant. To research
+  before designing anything: a privacy notice (what is collected, how long it is kept, the
+  user's rights), with retention periods for connection logs, IP addresses and the audit log;
+  reports of illegal content accepted from anyone, not only members, and a statement of reasons
+  to a user whose content is removed (the EU Digital Services Act); a copyright takedown and
+  counter-notice process (the US DMCA safe harbour); illegal content that must be preserved and
+  reported rather than only deleted; a legal contact on the about page. Depends on: content
+  moderation, registration gates, about this BBS.
 - **Advisory signals**: at registration the address is checked against the Tor exit list and
   abuse feeds, downloaded as lists and checked on the board, never looked up one user at a
   time with a third party; a match is a flag for the sysop, never a block. An account sharing
@@ -1201,8 +1236,11 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   moderator is the one who applied the ban). Depends on: content moderation, mail networks.
 - **Sysop notification triggers**: the Sysop is notified of a new user, an upload awaiting
   approval, feedback received, an appeal filed and a scheduled event that failed (with the tail
-  of its output), in the inbox and optionally by email. Depends on: bans, suspensions and
-  appeals, SMTP client, event scheduler.
+  of its output), in the inbox and optionally by email. Operational alerts too: a certificate
+  about to expire, disk space running low, a server whose lease was lost, a network link with no
+  successful session for a number of days the sysop sets, a failed backup, and a critical
+  update. Depends on: bans, suspensions and appeals, SMTP client, event scheduler, certificates,
+  mail networks, backup and restore, auto-update.
 
 ## Chat
 
