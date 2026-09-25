@@ -539,8 +539,27 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   Depends on: scripting layer, public API.
 - **User editor**: `hadv-useredit` and `hadv-useredit-gui`, spawned from the console or run
   alone. `hadv-useredit` also has a CLI (suspend, unlock, reset, change role) for scripting and
-  recovery, signing in and taking secrets as the `hadv-config` CLI does. Depends on: RBAC,
-  remote administration.
+  recovery, signing in and taking secrets as the `hadv-config` CLI does. It edits every profile
+  field; the handle, through the shared handle check; primary and grant roles; status
+  (suspend, unlock, restore from the virtual deleted state, delete); time-limit, time-bank,
+  ratio and rate-limit overrides; per-user post approval; the Sysop note; forcing a password
+  change; clearing the second factor under account recovery's rules; and ending the user's
+  sessions. It shows statistics, login history, former handles and sessions read-only. It
+  never shows a password or its hash or any second-factor secret, never opens private mail
+  (account #1's audited break-glass read is the only way), and never shows the user's
+  accessibility preferences. Every editor action is its own permission, held by Sysop and
+  Co-Sysop by default; a Co-Sysop cannot edit a Sysop or Co-Sysop account or grant those
+  roles, and only account #1 itself or the local operator changes #1's protected fields. When
+  staff change a user's email address the old address is told, as when the user changes it
+  themselves, and destructive actions need a step-up. Every change is audited with its before
+  and after values, never a secret, and the user is told of a role change, a suspension, a
+  cleared second factor and an email change. When two staff edit the same user, the second
+  save is refused as changed since it was opened, never silently overwriting the first.
+  `hadv-useredit-gui` ships with the TUI; the developer writes its forms. Depends on: RBAC,
+  remote administration, user profile and new-user questions, reserved and former usernames,
+  account deletion, account recovery, step-up re-authentication, time limits and time bank,
+  rate limits, inbox; its per-user approval on content moderation; its email notice on email
+  address change confirmation; its session list on sessions and devices.
 - **Waiting-for-Caller console**: `hadv-console` (TUI only; no CLI unless a use case appears)
   and `hadv-console-gui`, run on the server or remotely; long-lived tokens; the GUI minimises
   to the taskbar and can start minimised so it starts after login. It shows who is on which
@@ -1325,7 +1344,25 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
 - **Multi-user chat**: users chat with other online users in an IRC-style chat, supported by
   the content moderation system, honouring blocks and private profiles as who's online does.
   A user can page another user and send them a chat request; do not disturb blocks both.
-  Depends on: who's online, content moderation, user preferences.
+  Rooms: a lobby that always exists; standing rooms the sysop creates, each naming who can join
+  and who moderates it, as message areas name their roles; and rooms users open themselves, a
+  permission (User yes, New User no, by default), which close when they empty. Each room has a
+  topic. A private room is invite-only: its owner invites and removes people, and invitations
+  honour blocks and do not disturb; an accepted chat request opens a private room for the two,
+  so private chat is not a second mechanism. One chat for the whole board: callers on every
+  server, terminal and web alike, share the same rooms. IRC-style commands (`/join`, `/me`,
+  `/msg`, `/who`, `/topic`, `/quit`): inside chat a line starting with `/` is a chat command,
+  the one place the themes' `/` long-command rule gives way. Chat is not logged by default; a
+  room keeps a short scrollback (such as the last 20 lines, for an hour) for someone joining.
+  Reporting a line captures it, with the lines before it for context, into the moderation
+  queue. The sysop can turn logging on for a standing room, with a retention period, and the
+  room then says it is logged; a private room is never logged beyond reported excerpts. Room
+  moderators can mute, kick, or ban from the room for a set time; watched words, rate limits
+  and bans apply to every chat line, and a line has a maximum length. Chat is lines with a name
+  in front, which a screen reader follows as it is; a split screen with a separate typing line
+  is an option per terminal, never required. Depends on: who's online, content moderation,
+  user preferences, role-based access control, blocking and muting, watched words, rate
+  limits, bans, suspensions and appeals.
 - **Inter-BBS chat**, for later: multi-user chat joins rooms shared with other boards. MRC
   (Multi Relay Chat) compatibility was researched first, rather than inventing a network, in
   HeliosDesign `records/research/mrc-inter-bbs-chat.md`: its protocol is not openly published,
