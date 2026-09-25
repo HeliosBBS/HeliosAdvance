@@ -233,21 +233,29 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   and can change it in their preferences. Depends on: languages, accounts and login.
 - **Role-based access control**: roles carry permissions and configuration (upload/download
   ratio, whether 2FA is required, and the like). Every gate fails closed; every operator action
-  is audited. Seeded roles, by fixed ID because names are editable: 1 Sysop, 2 Co-Sysop, 3 User,
-  4 Guest, 5 New User. Sysop: super user, unrestricted global access; cannot be deleted; display
-  name changeable, access not editable. Co-Sysop: limited administration (users, file areas,
-  message bases); cannot touch system configuration, promote anyone to Sysop or Co-Sysop, take
-  over Sysop or Co-Sysop accounts, or lock out a Sysop; cannot be deleted; editable (display
-  name, additional restrictions). User: regular registered users; cannot be deleted; editable.
-  Guest: not signed in; cannot be deleted; editable. New User: baseline probationary access; can
-  be deleted; fully editable. Account #1 is always the main sysop account and owner of the
-  system. The Sysop and Co-Sysop roles require 2FA by default; each role's second factor is
-  Required, Optional or Disabled. Every permission can be granted to other roles, except those a
-  brief fixes to the Sysop role or to account #1. A role in use cannot be deleted; the refusal
-  names what uses it. Guest, on the web, reads public areas and cannot post, upload or run
-  doors; Guest downloads only where the sysop turns that on for an area, off by default; Guest
-  over Telnet, SSH and FTP may come later. Sysop and Co-Sysop hold the permission to see
-  everyone in who's-online, private or blocked, by default. Depends on: accounts and login.
+  is audited. The direction for the brainstorm, not yet a decision: every user has one primary
+  role, which carries the settings (ratio, time limits, the second-factor requirement,
+  inactivity days, the New User sandbox) and which promotion moves; grant roles only add
+  permissions, such as moderating certain message and file areas, carry no settings, and are
+  untouched by promotion. Sysop and Co-Sysop are primary roles only; a grant never carries a
+  permission a brief fixes to the Sysop role or to account #1; a restriction from the primary
+  role or an area still applies to what a grant adds. It is rederived in the brainstorm, not
+  taken from the previous project's notes. Seeded roles, by fixed ID because names are editable:
+  1 Sysop, 2 Co-Sysop, 3 User, 4 Guest, 5 New User. Sysop: super user, unrestricted global
+  access; cannot be deleted; display name changeable, access not editable. Co-Sysop: limited
+  administration (users, file areas, message bases); cannot touch system configuration, promote
+  anyone to Sysop or Co-Sysop, take over Sysop or Co-Sysop accounts, or lock out a Sysop; cannot
+  be deleted; editable (display name, additional restrictions). User: regular registered users;
+  cannot be deleted; editable. Guest: not signed in; cannot be deleted; editable. New User:
+  baseline probationary access; can be deleted; fully editable. Account #1 is always the main
+  sysop account and owner of the system. The Sysop and Co-Sysop roles require 2FA by default;
+  each role's second factor is Required, Optional or Disabled. Every permission can be granted
+  to other roles, except those a brief fixes to the Sysop role or to account #1. A role in use
+  cannot be deleted; the refusal names what uses it. Guest, on the web, reads public areas and
+  cannot post, upload or run doors; Guest downloads only where the sysop turns that on for an
+  area, off by default; Guest over Telnet, SSH and FTP may come later. Sysop and Co-Sysop hold
+  the permission to see everyone in who's-online, private or blocked, by default. Depends on:
+  accounts and login.
 - **Rate limits**: posting, private mail, uploads, search and registration are each limited
   per account and per IP address, by one mechanism on every front end, with a clear "try again
   in N seconds". The defaults are generous and roles can override them; Sysop and Co-Sysop get
@@ -618,31 +626,34 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   terminal, reactions show as counts in the message header, with a hotkey to react. The
   reaction set is configurable per theme. A banned or suspended user's reactions stop counting
   while the restriction lasts and count again when it is lifted. Depends on: message bases.
-- **File bases**: file areas under conferences. Storage is a separate entry, since more than
-  file areas need it. Local directory and file paths are supported; the architecture must handle
-  availability across servers: a file local to one server may need to be transferred temporarily
-  to another, or marked OFFLINE when its owning server is unavailable. An OFFLINE file stays
-  listed and requestable (default: listed). Metadata is read from files that support it (audio,
-  images) when uploaded outside an archive; EXIF and other embedded metadata are stripped from
-  images on upload after being harvested into the file record (default: strip). A free-file,
-  no-ratio flag per file and per area. A new-files scan since the last call, honouring the same
-  follow graph as the new-message scan. File comments and ratings by users who downloaded the
-  file, using reactions. Resumable, chunked HTTP uploads on the web front end. Maximum upload
-  size per file and per area (off, or bytes; off). Upload description requirements: minimum
-  length, extended multi-line (default one line, at least 10 characters). An upload credit
-  model: bytes, files or ratio-exempt, with per-role and per-area overrides (default 3:1 by
-  bytes). Download counters per file, with most-downloaded and newest-files listings. Listing
-  options: sort by name, date, size or downloads; pattern filter; paged or full list. A
-  tagged-file batch queue: tag while browsing, download the batch at the session's end.
-  Aborted-upload handling, with resume on the next call for legacy protocols. Uploader
-  attribution in listings, and a "my uploads" view per user. A per-area file naming policy: long
-  names or 8.3, case handling, illegal-character rewriting. Ad-file injection: sysop-configured
-  advertisement text stamped as an extra file into outgoing archives, with its own enable, text
-  and filename settings; default off, and never into an archive that carries a signature.
-  FILE_ID.DIZ and DESCRIPT.ION are read into the description, as untrusted text: only the
-  board's allowed attribute codes are kept, every other escape sequence is stripped, the text is
-  size-bounded, and the archive is opened under the same limits as virus scanning. A ban list of
-  filename patterns. Per area, a maximum number of files and a purge by age, both off by
+- **File bases**: file areas under conferences. Each area names the roles that can view it,
+  download, upload and moderate, and whether uploads need approval, as message areas name
+  theirs; defaults: view and download Sysop, Co-Sysop, User and New User, upload Sysop,
+  Co-Sysop, User and New User, moderate Sysop and Co-Sysop, approval no. Storage is a separate
+  entry, since more than file areas need it. Local directory and file paths are supported; the
+  architecture must handle availability across servers: a file local to one server may need to
+  be transferred temporarily to another, or marked OFFLINE when its owning server is
+  unavailable. An OFFLINE file stays listed and requestable (default: listed). Metadata is read
+  from files that support it (audio, images) when uploaded outside an archive; EXIF and other
+  embedded metadata are stripped from images on upload after being harvested into the file
+  record (default: strip). A free-file, no-ratio flag per file and per area. A new-files scan
+  since the last call, honouring the same follow graph as the new-message scan. File comments
+  and ratings by users who downloaded the file, using reactions. Resumable, chunked HTTP uploads
+  on the web front end. Maximum upload size per file and per area (off, or bytes; off). Upload
+  description requirements: minimum length, extended multi-line (default one line, at least 10
+  characters). An upload credit model: bytes, files or ratio-exempt, with per-role and per-area
+  overrides (default 3:1 by bytes). Download counters per file, with most-downloaded and
+  newest-files listings. Listing options: sort by name, date, size or downloads; pattern filter;
+  paged or full list. A tagged-file batch queue: tag while browsing, download the batch at the
+  session's end. Aborted-upload handling, with resume on the next call for legacy protocols.
+  Uploader attribution in listings, and a "my uploads" view per user. A per-area file naming
+  policy: long names or 8.3, case handling, illegal-character rewriting. Ad-file injection:
+  sysop-configured advertisement text stamped as an extra file into outgoing archives, with its
+  own enable, text and filename settings; default off, and never into an archive that carries a
+  signature. FILE_ID.DIZ and DESCRIPT.ION are read into the description, as untrusted text: only
+  the board's allowed attribute codes are kept, every other escape sequence is stripped, the
+  text is size-bounded, and the archive is opened under the same limits as virus scanning. A ban
+  list of filename patterns. Per area, a maximum number of files and a purge by age, both off by
   default, because a purge deletes uploads the sysop curated. Per role, a daily download byte
   limit and a largest downloadable file. A file area can be a text library (G-files): its files
   cost no ratio, open inline with the same stripping, and show the SAUCE title and author in the
