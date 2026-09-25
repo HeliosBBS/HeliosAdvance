@@ -356,6 +356,14 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
 - **Proxies in front of the board**: PROXY protocol v1 and v2, `X-Forwarded-For`,
   `X-Real-IP`, `Forwarded`; honoured only from a trusted proxy list so the caller's address
   cannot be forged. Depends on: Telnet, SSH and web callers.
+- **Gateway session details**: a registered gateway, HeliosSIP, passes the caller ID and the
+  connect speed into the session record, trusted only from registered gateways, as the PROXY
+  protocol is only from trusted proxies. The connect speed shows in the classic style and is
+  used in drop files and baud-rate emulation. A caller ID is sensitive: the Sysop sees it,
+  users never do, and it is kept only as long as the connection log; banning a number works
+  as an address ban does. How the two travel is the design of a contract between the
+  repositories, kept in the contracts register. Depends on: SSH caller, proxies in front of the
+  board, address bans. Touches the SIP gateway.
 - **Doors**: the board offers door games through BBSLink, DoorParty and Helios Doors
   (`hadv-doors`); the board never runs a door itself. Helios Doors is a separate,
   BBS-agnostic service, on the same hardware or its own; the board can use several
@@ -552,24 +560,28 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   Co-Sysop, User, New User) and moderate (default Sysop, Co-Sysop); required minimum and maximum
   age, genders and terminal type, as for conferences. Settings, with defaults: maximum messages
   (5000); purge by age (off, or days; off); duplicate checking by a hash searched in the area
-  (off, or the number allowed; off); allow anonymous posts (no); require real names (no);
-  require an internet email address (no); allow message quoting (yes); allow word wrap (yes);
-  required reading (no); allow message edit (off, within N minutes, or always; within 15
-  minutes; networked areas force off), edited messages keeping their prior bodies, readers
-  seeing an "edited" marker and moderators the diff; slow mode, one post per user per N minutes
-  (off); auto-close inactive threads (off, or days; off); pinned messages with an optional
-  expiry date, set by the area's moderators; watched words with an action of block, send to the
-  moderation queue, or tag silently (none seeded); required approval (no). Moderator thread
-  tools: split, merge, move (leaving a stub), close. Maximum message size in bytes or lines (64
-  KB; networked areas clamp to the network's limit). Attachment policy: off, allowed, or allowed
-  with approval, with a maximum attachment size and count. An origin line or network tagline per
-  area, with a board-wide default. A read-only, archived state: no new posts, existing ones
-  readable (off). Message base packing and renumbering as a maintenance job, safe against
-  in-flight readers. Area aliases or short names usable in menu commands and the `area:` search
-  filter. Default new-scan participation: force on, default on, or default off (default on).
-  Area sort order and numbering independent of creation order, shared with the web front end.
-  Per-area header display: real name or handle, location, and whether the network address is
-  shown. An "Attachment Storage Backend" setting per area, letting its attachments live on a
+  (off, or the number allowed; off); anonymous posts: no, anonymous or pseudonymous (no), where
+  pseudonymous gives each user a stable alias per area, not linkable across areas nor derivable
+  by users, both being hidden from users but not from staff, and pseudonymous cannot be combined
+  with requiring real names; require real names (no); require an internet email address (no);
+  allow message quoting (yes); allow word wrap (yes); required reading (no); allow message edit
+  (off, within N minutes, or always; within 15 minutes; networked areas force off), edited
+  messages keeping their prior bodies, readers seeing an "edited" marker and moderators the
+  diff; slow mode, one post per user per N minutes (off); auto-close inactive threads (off, or
+  days; off); pinned messages with an optional expiry date, set by the area's moderators;
+  watched words with an action of block, send to the moderation queue, or tag silently (none
+  seeded); required approval (no). Moderator thread tools: split, merge, move (leaving a stub),
+  close. Maximum message size in bytes or lines (64 KB; networked areas clamp to the network's
+  limit). Attachment policy: off, allowed, or allowed with approval, with a maximum attachment
+  size and count. An origin line or network tagline per area, with a board-wide default. A
+  read-only, archived state: no new posts, existing ones readable (off). Message base packing
+  and renumbering as a maintenance job, safe against in-flight readers, and beside it an
+  integrity check that rebuilds an area's pointers and indexes, equally safe, reporting its
+  progress in Taskview. Area aliases or short names usable in menu commands and the `area:`
+  search filter. Default new-scan participation: force on, default on, or default off (default
+  on). Area sort order and numbering independent of creation order, shared with the web front
+  end. Per-area header display: real name or handle, location, and whether the network address
+  is shown. An "Attachment Storage Backend" setting per area, letting its attachments live on a
   different storage-registry entry from the area's own files. Initial areas, created only during
   initial setup and freely editable or deletable afterwards: Announcement (read by Sysop,
   Co-Sysop, User, New User, Guest; required reading, yes) and General Discussion (read by Sysop,
@@ -627,6 +639,11 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   well as the area pointer, for threaded and out-of-order reading; kept naively that is a row
   per user per message, so how it is stored is decided with that cost in mind. Depends on:
   message bases, private messages.
+- **Scheduled posts**: a post publishes itself at a set time, a draft plus a one-off event in
+  the event scheduler. Permissions are checked again when it publishes: if its author may no
+  longer post there, or the area is gone, it does not publish and the author is told.
+  Scheduling a post is a permission, held by Sysop and Co-Sysop by default and grantable to
+  area moderators for their own areas. Depends on: event scheduler, drafts and read state.
 - **Welcome mail**: each new user gets a welcome message from the sysop, from a template per
   language, on by default; the shipped template is short and friendly. Depends on: private
   messages, languages.
@@ -644,8 +661,10 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   `before:`, `after:` and `has:attachment`. Result counts, "no results" and suggestions are
   worked out only over what the user can read; a username search never finds a private
   profile, except for a role that may see private users; results from users the searcher has
-  blocked never appear, and muted content stays hidden. Depends on: message bases, file bases,
-  RBAC, blocking and muting, rate limits.
+  blocked never appear, and muted content stays hidden. A saved search can notify its owner of
+  new matches, which covers keyword watches: only for posts the user can read, never from a
+  muted area or a blocked user, and with a cap on such searches per user. Depends on: message
+  bases, file bases, RBAC, blocking and muting, rate limits.
 - **File transfer on classic connections**: upload and download protocols over Telnet and SSH
   sessions. A protocol registry: XModem, XModem-1K, YModem, YModem-G and ZModem, with HTTP(S)
   and FTP as entries of their own; each protocol is on or off and available per role, default
@@ -674,6 +693,11 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   web users always get a full-screen editor, and legacy protocols default to the full-screen
   editor. A caller without ANSI gets the line editor, whatever the preference. Depends on:
   message bases, private messages.
+- **Content warnings and spoilers**: a warning on a whole post, and spoiler sections inside
+  one; the terminal hides them behind a key ("press R to read") and the web behind a click. On
+  network export the warning becomes a plain first line ("CW: ...") and inline spoilers show in
+  full, since other boards cannot hide them, and the editor tells the author so in a networked
+  area. Depends on: message bases, full-screen text editor.
 - **Bulk file import**: `hadv-fileimport` loads files into the board's file bases from the
   command line. Depends on: remote administration, file bases.
 - **SMTP client (sending email)**: the board delivers outbound email directly to destination
@@ -729,6 +753,13 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   is opened, so a message the user can no longer read shows "no longer available". Bookmarks
   are personal data, exported and deleted with the account. Depends on: message bases,
   notifications.
+- **Link previews**, for later: off by default; the title and description of a posted link,
+  shown as text on the terminal. The fetcher takes http and https only; checks the address
+  after DNS resolution and again on every redirect, refusing private, loopback, link-local and
+  cloud-metadata ranges; has a small size cap, a short timeout and few redirects; fetches once,
+  when the link is posted, and caches the result, never fetching on view; and treats what it
+  fetches as untrusted, stripping escape sequences. The same fetcher serves any later check
+  that a BBS list entry is alive. Depends on: message bases.
 - **Social media features**: ready for an early brainstorm. Following an area is new-scan
   participation (force on, default on or default off per area), so a new user's feed is not
   empty; users follow other users; each profile has a microblog, extending one-liners; likes
@@ -865,8 +896,12 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   directly is decided in the brainstorm: CPU cost through a web server is the concern. The BinkP
   listeners, BinkP TCP/24554 and BinkP over TLS TCP/24553, are off by default and bind to all
   addresses; whether each is on, its port and its binding changeable in `hadv-config`. Incoming
-  FTP and FTPS are the FTP and FTPS server's listeners. Depends on: remote administration,
-  message bases, private messages.
+  FTP and FTPS are the FTP and FTPS server's listeners. `hadv-config` and `hadv-config-gui`
+  have a subscriptions screen for each network: it reads the network's lists of subs, echoes
+  and file areas, shows what the board subscribes to and what it hosts, and subscribes and
+  unsubscribes in bulk, mapped to existing areas or new ones, sending the requests through the
+  tossers with the per-area prompts message bases already has. Depends on: remote
+  administration, message bases, private messages.
 - **FTN networks (`hadv-fido`)**: multiple FTN networks and multiple AKAs per network, with AKA
   matching on export. NODELIST and NODEDIFF filenames configurable per network; when they
   arrive by TIC the nodelist is compiled, for viewing, searching and validating systems for
@@ -883,8 +918,11 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   table: which links get which netmail, hub and uplink designation, bundle archive format.
   Unknown-node inbound handling: Reject, Unsecure inbound or Accept, default Reject. Hub
   operation: per-link read-only echoes and area passthrough. Per-link flow reports: packets
-  and bytes in and out, dupes rejected, last successful session. Depends on: mail networks,
-  file bases, external archivers.
+  and bytes in and out, dupes rejected, last successful session. Later: packets from inter-BBS
+  league games (BRE, Usurper and the like), handed over by a Helios Doors instance as opaque
+  files, go to and from the league's hub as netmail or file attachments, carried without being
+  understood, so a new game needs no engine change; the hand-off is a contract with
+  HeliosDoors. Depends on: mail networks, file bases, external archivers, doors.
 - **QWK BBS networks (`hadv-qwk`)**: several QWK networks, each with its settings and their
   defaults: enabled (disabled); support gating (no); network name, hub system ID, hub address
   (IP or FQDN), QWK username and QWK password (blank); archive format, from the list in
@@ -989,6 +1027,12 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   CAPTCHA, guards web registration, on by default. New-user feedback to the sysop: no,
   optional or required with a minimum length; default no. Depends on: accounts and login,
   user profile and new-user questions, SMTP client, content moderation.
+- **Sign in with an identity provider**, for later: an OIDC or OAuth2 client that links an
+  account to an outside identity, such as an organisation's, never bypassing registration
+  gates, the terms of service or the New User sandbox. An outside login replaces the password,
+  not the second factor, whose per-role requirement still applies. The terminal uses the
+  device flow (RFC 8628), so it is not web-only. Off by default, with each provider added by the
+  Sysop. Depends on: accounts and login, registration gates, second factor.
 - **Private mail privacy**: a stated policy, disclosed in the terms of service at
   registration: the board offers no way to read a user's mail except a break-glass read by
   account #1 alone, not the Sysop role, always audited. The policy is honest that whoever runs
@@ -1031,6 +1075,13 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   it afterwards. The board never connects to a listed host to check it; an entry shows when a
   user last confirmed it. Depends on: content moderation, FTN networks, VirtualNET networks,
   WWIV networks.
+- **Spam filtering**: inbound and outbound email is checked by an external spam checker, such
+  as rspamd or SpamAssassin, the way virus scanning uses ClamAV, with thresholds set in
+  `hadv-config` and `hadv-config-gui`. High-confidence spam is rejected during the SMTP
+  conversation, never accepted and then deleted; low-confidence spam goes to the user's junk
+  folder, and optionally to the review queue. A burst of outbound mail from one account raises
+  an alert to content moderation, beside the rate limits. Depends on: SMTP server, SMTP
+  client, content moderation, rate limits.
 - **Virus scanning and archive conversion**: uploads are virus scanned online, offline or in
   the background, chosen in `hadv-config` and `hadv-config-gui`. Online scans immediately
   after the upload and shows the user a progress screen; offline scans after the user has
@@ -1076,6 +1127,11 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
 - **Multi-user chat**: users chat with other online users in an IRC-style chat, supported by
   the content moderation system, honouring blocks and private profiles as who's online does.
   Depends on: who's online, content moderation.
+- **Inter-BBS chat**, for later: multi-user chat joins rooms shared with other boards. Research
+  MRC (Multi Relay Chat) compatibility first, rather than inventing a network: its protocol and
+  hub model, TLS, and whether it is specified openly enough to implement from our own notes; the
+  research may say no. Remote chat passes through the same moderation as local chat, and users
+  can block remote chatters. Depends on: multi-user chat, blocking and muting.
 - **Sysop break-in chat**: the Sysop can break in on a caller with a two-way split-screen chat
   from the WFC consoles (`hadv-console`, `hadv-console-gui`). Sysop only by default; the Sysop
   can grant the permission to other roles. A caller without ANSI gets line-by-line chat.
