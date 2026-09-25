@@ -99,6 +99,12 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   `hadv-cert`. Depends on: configuration.
 - **Time zones and daylight saving**: times shown to callers and sysops follow daylight saving
   time where appropriate. Depends on: configuration.
+- **Cross-server task ownership**: the board is aware, across servers, of which server owns a
+  task, so two servers never do the same work at once: two servers never dial out for a network
+  call on the same packet, and an event such as Daily Maintenance runs on one server only. The
+  same holds for anything else where servers could race. The developer's thinking: a NOTIFY
+  between servers as well as a record lock in the database. Depends on: servers, nodes and one
+  board.
 - **Event scheduler**: an event scheduler, like cron, that runs built-in actions and external
   programs and scripts on a schedule. Each event is pinned to any server (one server picks
   itself to run it and locks the others out; done when that server has run it), all servers
@@ -106,17 +112,17 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   maximum runtime, after which it is killed; runs a missed event, default yes; retries on
   failure, off or N retries with backoff, default off; and has an overlap policy for when the
   previous run is still going, skip, queue or kill the previous, default skip. Events can be
-  disabled without being deleted and run now from the console. Run history (last run,
-  duration, exit code, the server that ran it) is kept for N days. An event that runs an
-  external program is created only in `hadv-config`, and audited. A midnight repeated by a
-  daylight-saving change never runs an event twice. Daily Maintenance is event 1: it cannot be
-  deleted or edited, runs at midnight local time once a day on any server, runs if missed, and
-  resets the user and BBS statistics and does anything else that must be done daily. Jobs
-  other entries already hand it: the daily statistics rollover, deleting accounts past their
-  role's Maximum Days of User Inactivity, permanently deleting accounts whose time in the
-  virtual deleted state is up, the re-scan sweep of quarantined uploads, message base packing
-  and renumbering, and mail polling. Depends on: servers, nodes and one board; time zones and
-  daylight saving.
+  disabled without being deleted and run now from the console. Run history (last run, duration,
+  exit code, the server that ran it) is kept for N days. An event that runs an external program
+  is created only in `hadv-config`, and audited. A midnight repeated by a daylight-saving change
+  never runs an event twice. Daily Maintenance is event 1: it cannot be deleted or edited, runs
+  at midnight local time once a day on any server, runs if missed, and resets the user and BBS
+  statistics and does anything else that must be done daily. Jobs other entries already hand it:
+  the daily statistics rollover, deleting accounts past their role's Maximum Days of User
+  Inactivity, permanently deleting accounts whose time in the virtual deleted state is up, the
+  re-scan sweep of quarantined uploads, message base packing and renumbering, and mail polling.
+  Depends on: servers, nodes and one board; time zones and daylight saving; cross-server task
+  ownership.
 - **Attribute codes**: the colour and heart codes the board supports: WWIV, VBBS and VADV
   heart codes, with WWIV taking precedence over VBBS and VADV when both are entered; PCBoard
   (`@Xxx`) codes; Wildcat (`@xx@`) codes; Celerity (`|x`) codes; Renegade (`|xx`) codes;
@@ -935,12 +941,12 @@ built until it has been through `feature-brainstorm` and has a brief of its own.
   directly is decided in the brainstorm: CPU cost through a web server is the concern. The BinkP
   listeners, BinkP TCP/24554 and BinkP over TLS TCP/24553, are off by default and bind to all
   addresses; whether each is on, its port and its binding changeable in `hadv-config`. Incoming
-  FTP and FTPS are the FTP and FTPS server's listeners. `hadv-config` and `hadv-config-gui`
-  have a subscriptions screen for each network: it reads the network's lists of subs, echoes
-  and file areas, shows what the board subscribes to and what it hosts, and subscribes and
-  unsubscribes in bulk, mapped to existing areas or new ones, sending the requests through the
-  tossers with the per-area prompts message bases already has. Depends on: remote
-  administration, message bases, private messages.
+  FTP and FTPS are the FTP and FTPS server's listeners. `hadv-config` and `hadv-config-gui` have
+  a subscriptions screen for each network: it reads the network's lists of subs, echoes and file
+  areas, shows what the board subscribes to and what it hosts, and subscribes and unsubscribes
+  in bulk, mapped to existing areas or new ones, sending the requests through the tossers with
+  the per-area prompts message bases already has. Depends on: remote administration, message
+  bases, private messages, cross-server task ownership.
 - **FTN networks (`hadv-fido`)**: multiple FTN networks and multiple AKAs per network, with AKA
   matching on export. NODELIST and NODEDIFF filenames configurable per network; when they
   arrive by TIC the nodelist is compiled, for viewing, searching and validating systems for
